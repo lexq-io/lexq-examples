@@ -1,4 +1,23 @@
+# Dependencies
 node_modules/
-.idea
-.env
+
+# Build output
 dist/
+target/
+out/
+*.class
+
+# Environment — .env.example stays tracked, do not broaden to .env*
+.env
+
+# IDE / editors
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

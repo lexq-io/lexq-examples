@@ -55,3 +55,4 @@ exactly which rules produced this decision.
 ## Worked example
 
 - [`typescript/`](./typescript) — a runnable pricing service
+- [`java/`](./java) — the same pricing service, Spring Boot

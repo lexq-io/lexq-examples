@@ -1,0 +1,10 @@
+server:
+  port: 3000
+
+lexq:
+  # https://api.lexq.io
+  api-url: ${LEXQ_API_URL:https://api.lexq.io}
+  # your API key — keep it on the server, never ship it to a browser
+  api-key: ${LEXQ_API_KEY}
+  # the policy group to evaluate against
+  group-id: ${LEXQ_GROUP_ID}
