@@ -3,6 +3,11 @@
 A minimal backend service that calls the LexQ Execution API to price an
 order. The LexQ API key stays on the server.
 
+## Requirements
+
+- Node.js 20+ — the example uses the built-in `fetch`
+- pnpm (`corepack enable` ships it with Node)
+
 ## Run
 
 1. `pnpm install`

@@ -3,6 +3,7 @@ package io.lexq.example;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -19,8 +20,15 @@ import java.util.function.Predicate;
 @Component
 public class LexqClient {
 
-    /** Never treat a status code as an error: the LexQ envelope is inspected below instead. */
-    private static final Predicate<HttpStatusCode> NEVER = status -> false;
+    /**
+     * Claim every status for a handler that does nothing, which stops RestClient from
+     * throwing on 4xx/5xx — {@link #evaluate} inspects the LexQ envelope instead.
+     *
+     * <p>The predicate selects which statuses this handler owns, not which ones count as
+     * errors. A predicate that matches nothing leaves Spring's default handler in place,
+     * so every LexQ error surfaces as a transport failure with no status and no code.
+     */
+    private static final Predicate<HttpStatusCode> ALL = status -> true;
 
     private final RestClient restClient;
     private final String apiKey;
@@ -33,7 +41,7 @@ public class LexqClient {
                 .baseUrl(props.apiUrl())
                 // A non-2xx status and a 2xx body with result != SUCCESS are both
                 // handled explicitly in evaluate(); disable RestClient's default throw.
-                .defaultStatusHandler(NEVER, (request, response) -> { })
+                .defaultStatusHandler(ALL, (request, response) -> { })
                 .build();
     }
 
@@ -49,9 +57,9 @@ public class LexqClient {
      *                       same request does not execute twice; may be {@code null}.
      */
     public ExecutionResult evaluate(Map<String, Object> facts, String idempotencyKey) {
-        ExecutionEnvelope envelope;
+        ResponseEntity<ExecutionEnvelope> response;
         try {
-            envelope = restClient.post()
+            response = restClient.post()
                     .uri("/api/v1/execution/groups/{groupId}", groupId)
                     // The API key lives on the server only — it never ships to a browser.
                     .header("x-api-key", apiKey)
@@ -63,15 +71,20 @@ public class LexqClient {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("facts", facts, "context", Map.of()))
                     .retrieve()
-                    .body(ExecutionEnvelope.class);
+                    // toEntity, not body: the HTTP status classifies the failure and the
+                    // exception handler needs it. body() would discard it.
+                    .toEntity(ExecutionEnvelope.class);
         } catch (RestClientException e) {
-            throw new LexqExecutionException(null, "transport error: " + e.getMessage());
+            // No status — the request never reached LexQ.
+            throw new LexqExecutionException(null, null, "transport error: " + e.getMessage());
         }
 
+        ExecutionEnvelope envelope = response.getBody();
         if (envelope == null || !"SUCCESS".equals(envelope.result())) {
-            String code = envelope != null ? envelope.code() : null;
-            String message = envelope != null ? envelope.message() : "empty response";
-            throw new LexqExecutionException(code, message);
+            throw new LexqExecutionException(
+                    response.getStatusCode().value(),
+                    envelope != null ? envelope.errorCode() : null,
+                    envelope != null ? envelope.message() : "empty response");
         }
         return envelope.data();
     }
@@ -81,10 +94,17 @@ public class LexqClient {
     // ExecutionEnvelope is internal plumbing (private); the rest are the
     // response contract returned to callers (public).
 
-    /** The internal {result, data, code, message} wrapper around every response. */
+    /**
+     * The internal wrapper around every response. The success branch carries {@code data};
+     * the failure branch carries {@code errorCode} + {@code message}.
+     *
+     * <p>The failure key is {@code errorCode}, not {@code code}. Getting this wrong is
+     * invisible at runtime: {@code ignoreUnknown = true} drops the real field and leaves
+     * the mistyped one null, so every error arrives without a code.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record ExecutionEnvelope(String result, ExecutionResult data,
-                                     String code, String message) { }
+                                     String errorCode, String message) { }
 
     /** The {@code data} block of a successful execution. */
     @JsonIgnoreProperties(ignoreUnknown = true)

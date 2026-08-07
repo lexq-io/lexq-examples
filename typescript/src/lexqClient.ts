@@ -35,6 +35,29 @@ export interface ExecutionResult {
     decisionTraces: DecisionTrace[];
 }
 
+/**
+ * Thrown when LexQ returns result !== "SUCCESS", or when the call fails in transit.
+ *
+ * Both the HTTP status and the error code are kept: the status classifies the failure,
+ * the code names it. Callers need the code to branch — see the table at
+ * https://docs.lexq.io/api/execution#error-handling.
+ */
+export class LexqError extends Error {
+    constructor(
+        /** LexQ's HTTP status, or null if the call never reached LexQ. */
+        readonly httpStatus: number | null,
+        /**
+         * The LexQ error code (e.g. "P-015"), or null for a transport error.
+         * This is the value to branch on — it is stable, the message is not.
+         */
+        readonly errorCode: string | null,
+        message: string,
+    ) {
+        super(message);
+        this.name = "LexqError";
+    }
+}
+
 interface EvaluateOptions {
     context?: Record<string, unknown>;
     // Pass a stable key (e.g. your order ID) so a retry does not execute twice.
@@ -56,16 +79,26 @@ export async function evaluate(
     };
     if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
-    const res = await fetch(`${apiUrl}/api/v1/execution/groups/${groupId}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ facts, context: options.context ?? {} }),
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${apiUrl}/api/v1/execution/groups/${groupId}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ facts, context: options.context ?? {} }),
+        });
+    } catch (cause) {
+        // No status — the request never reached LexQ.
+        throw new LexqError(null, null, `transport error: ${(cause as Error).message}`);
+    }
 
     const body = await res.json();
     if (!res.ok || body.result !== "SUCCESS") {
-        throw new Error(
-            `LexQ ${res.status} ${body.code ?? ""}: ${body.message ?? "execution failed"}`,
+        // The failure key is `errorCode`, not `code`. Reading the wrong one is invisible
+        // at runtime: it is simply undefined, so every error arrives without a code.
+        throw new LexqError(
+            res.status,
+            body.errorCode ?? null,
+            body.message ?? "execution failed",
         );
     }
     return body.data as ExecutionResult;
