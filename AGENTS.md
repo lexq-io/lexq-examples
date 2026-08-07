@@ -4,7 +4,9 @@
 
 Runnable integration examples for [LexQ](https://lexq.io). One shared scenario,
 one track per language (`java/`, `typescript/`, more to come). Public repo —
-everything in English, including commits (`type. description`).
+everything in English, including commits (`type. description`), and no tool
+attribution in commit messages or PR bodies. `.claude/settings.json` enforces
+that for Claude Code; strip it by hand if your tool adds its own.
 
 Humans: start with the README in each track. This file is the contract layer.
 
