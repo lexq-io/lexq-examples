@@ -57,7 +57,7 @@ public class PricingController {
                 .body(Map.of("error", "rule evaluation failed"));
     }
 
-    record PriceRequest(String orderId, BigDecimal paymentAmount, String customerTier) { }
+    public record PriceRequest(String orderId, BigDecimal paymentAmount, String customerTier) {}
 
-    record PriceResponse(String orderId, Object finalPrice, String lexqTraceId) { }
+    public record PriceResponse(String orderId, Object finalPrice, String lexqTraceId) {}
 }
