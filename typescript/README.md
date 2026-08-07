@@ -22,6 +22,19 @@ order. The LexQ API key stays on the server.
          -H "Content-Type: application/json" \
          -d '{"orderId": "order-1", "paymentAmount": 150000, "customerTier": "VIP"}'
 
+   The response carries the price LexQ returned and the trace handle for it:
+
+       {"orderId":"order-1","finalPrice":132000,"lexqTraceId":"c25dcd49-19c2-4365-8d06-cd4d5c953b0c"}
+
+   `finalPrice` is whatever your deployed rules produced — 132000 here is a 12%
+   VIP discount on 150000. When no rule matches, `mutatedFacts` comes back empty
+   and the amount you sent is returned unchanged.
+
+   When the policy needs a fact this service did not send, the code reaches you
+   instead of a bare failure:
+
+       {"error":"rule evaluation failed","lexqErrorCode":"P-015"}
+
 ## Where to look
 
 - `src/lexqClient.ts` — the only file that talks to LexQ

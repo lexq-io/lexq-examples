@@ -25,6 +25,20 @@ needed — the wrapper downloads Maven on first run.
          -H "Content-Type: application/json" \
          -d '{"orderId": "order-1", "paymentAmount": 150000, "customerTier": "VIP"}'
 
+   The response carries the price LexQ returned and the trace handle for it:
+
+       {"orderId":"order-1","finalPrice":132000.00,"lexqTraceId":"c35c3116-6076-48ff-a328-b63cc2ec217a"}
+
+   `finalPrice` is whatever your deployed rules produced — 132000.00 here is a 12%
+   VIP discount on 150000. Amounts are `BigDecimal` end to end, so the scale the
+   engine rounded to survives the trip. When no rule matches, `mutatedFacts` comes
+   back empty and the amount you sent is returned at the scale you sent it.
+
+   When the policy needs a fact this service did not send, the code reaches you
+   instead of a bare failure:
+
+       {"error":"rule evaluation failed","lexqErrorCode":"P-015"}
+
 ## Where to look
 
 - `LexqClient.java` — the only file that talks to LexQ
