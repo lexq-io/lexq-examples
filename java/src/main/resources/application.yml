@@ -1,6 +1,15 @@
 server:
   port: 3000
 
+spring:
+  jackson:
+    deserialization:
+      # Decision outputs are money. Without this, Jackson reads a JSON decimal into a
+      # Double and the scale the engine computed (HALF_UP, 2) is gone before your code
+      # sees it. LexQ preserves that scale on the wire; losing it here defeats the point
+      # of an auditable decision.
+      use-big-decimal-for-floats: true
+
 lexq:
   # https://api.lexq.io
   api-url: ${LEXQ_API_URL:https://api.lexq.io}

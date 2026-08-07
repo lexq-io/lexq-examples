@@ -3,6 +3,19 @@
 
 export type Facts = Record<string, string | number | boolean>;
 
+// Money and JavaScript numbers.
+//
+// LexQ computes amounts as decimals and sends the scale it rounded to (`132000.48`).
+// `JSON.parse` turns that into an IEEE-754 double. Reading the value and handing it
+// back out — what this example does — round-trips exactly, so the pricing endpoint is
+// safe as written.
+//
+// Arithmetic is not. `0.1 + 0.2` is the usual demonstration, and the error compounds
+// across a cart. If you total, split, or tax a decision amount, parse the response
+// body yourself and keep the amount as a string, then use a decimal library. The Java
+// track has BigDecimal and uses it end to end; this is the one place the two tracks
+// cannot match, because the language has no decimal type.
+
 export interface ExecutionTrace {
     tenantId: string;
     policyGroupId: string;

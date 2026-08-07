@@ -32,10 +32,15 @@ public class PricingController {
     @PostMapping("/price")
     public PriceResponse price(@RequestBody PriceRequest request) {
         // Facts the deployed policy expects — see GET /groups/{id}/requirements.
-        Map<String, Object> facts = Map.of(
-                "payment_amount", request.paymentAmount(),
-                "customer_tier", request.customerTier()
-        );
+        //
+        // Built with put, not Map.of: Map.of rejects null values, so one absent request
+        // field would throw a NullPointerException here and LexQ would never be called.
+        // Omit what is missing and let the engine answer instead — P-015 names exactly
+        // which required facts were absent, which is better than anything this method
+        // could work out on its own.
+        Map<String, Object> facts = new LinkedHashMap<>();
+        if (request.paymentAmount() != null) facts.put("payment_amount", request.paymentAmount());
+        if (request.customerTier() != null) facts.put("customer_tier", request.customerTier());
 
         // Idempotency: a retry of the same order will not execute twice.
         ExecutionResult result = lexq.evaluate(facts, request.orderId());
@@ -44,10 +49,26 @@ public class PricingController {
         // record so the exact rules that priced it can be looked up later.
         log.info("order {} priced — LexQ traceId {}", request.orderId(), result.traceId());
 
-        Object finalPrice = result.mutatedFacts()
-                .getOrDefault("payment_amount", request.paymentAmount());
+        // A fact only appears in mutatedFacts if a rule changed it. No matching discount
+        // means no entry, and the amount the caller sent is already the final price.
+        BigDecimal finalPrice = money(
+                result.mutatedFacts().getOrDefault("payment_amount", request.paymentAmount()));
 
         return new PriceResponse(request.orderId(), finalPrice, result.traceId());
+    }
+
+    /**
+     * Reads a decision amount as {@code BigDecimal}, whatever JSON shape it arrived in.
+     *
+     * <p>Facts are typed {@code Object} on the wire, so a whole number deserializes to
+     * {@code Integer} and a decimal to {@code BigDecimal} (see the Jackson setting in
+     * application.yml). Passing either straight through would make the response type
+     * depend on whether a rule happened to match. Never convert through {@code double}:
+     * {@code BigDecimal.valueOf(d)} and {@code new BigDecimal(d)} both reintroduce the
+     * error this is here to avoid.
+     */
+    private static BigDecimal money(Object value) {
+        return value instanceof BigDecimal decimal ? decimal : new BigDecimal(value.toString());
     }
 
     /**
@@ -95,5 +116,5 @@ public class PricingController {
 
     public record PriceRequest(String orderId, BigDecimal paymentAmount, String customerTier) {}
 
-    public record PriceResponse(String orderId, Object finalPrice, String lexqTraceId) {}
+    public record PriceResponse(String orderId, BigDecimal finalPrice, String lexqTraceId) {}
 }

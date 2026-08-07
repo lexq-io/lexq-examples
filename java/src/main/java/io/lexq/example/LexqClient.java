@@ -34,10 +34,16 @@ public class LexqClient {
     private final String apiKey;
     private final String groupId;
 
-    LexqClient(LexqProperties props) {
+    /**
+     * Takes Spring Boot's auto-configured {@code RestClient.Builder} rather than
+     * {@code RestClient.builder()}. The injected one carries the application's Jackson
+     * setup, which is where {@code use-big-decimal-for-floats} lives — build a client
+     * from the static factory and decision amounts come back as {@code Double}.
+     */
+    LexqClient(LexqProperties props, RestClient.Builder builder) {
         this.apiKey = props.apiKey();
         this.groupId = props.groupId();
-        this.restClient = RestClient.builder()
+        this.restClient = builder
                 .baseUrl(props.apiUrl())
                 // A non-2xx status and a 2xx body with result != SUCCESS are both
                 // handled explicitly in evaluate(); disable RestClient's default throw.
