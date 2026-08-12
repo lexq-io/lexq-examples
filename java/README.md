@@ -12,7 +12,7 @@ needed — the wrapper downloads Maven on first run.
 
 ## Run
 
-1. Set the environment:
+1. Set the environment (the key's default **Execute only** scope is enough):
 
        export LEXQ_API_URL=https://api.lexq.io
        export LEXQ_API_KEY=<your-api-key>
@@ -27,10 +27,11 @@ needed — the wrapper downloads Maven on first run.
 
    The response carries the price LexQ returned and the trace handle for it:
 
-       {"orderId":"order-1","finalPrice":132000.00,"lexqTraceId":"c35c3116-6076-48ff-a328-b63cc2ec217a"}
+       {"orderId":"order-1","finalPrice":135000.00,"lexqTraceId":"c35c3116-6076-48ff-a328-b63cc2ec217a"}
 
-   `finalPrice` is whatever your deployed rules produced — 132000.00 here is a 12%
-   VIP discount on 150000. Amounts are `BigDecimal` end to end, so the scale the
+   `finalPrice` is whatever your deployed rules produced — 135000.00 here is the 10%
+   VIP discount built in the [quickstart](https://docs.lexq.io/quickstart), applied
+   to 150000. Amounts are `BigDecimal` end to end, so the scale the
    engine rounded to survives the trip. When no rule matches, `mutatedFacts` comes
    back empty and the amount you sent is returned at the scale you sent it.
 
