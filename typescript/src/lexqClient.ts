@@ -104,7 +104,25 @@ export async function evaluate(
         throw new LexqError(null, null, `transport error: ${(cause as Error).message}`);
     }
 
-    const body = await res.json();
+    // Not every response is JSON. A load balancer returning 502, or a 404 from a
+    // wrong base URL, sends HTML — and res.json() throws a SyntaxError on it. Left
+    // uncaught that error escapes as-is, so the caller's `instanceof LexqError`
+    // check misses it and the failure surfaces as an unhandled 500 instead of a
+    // classified one. The Java track gets this for free: RestClient wraps a
+    // deserialization failure in RestClientException, which is already caught above.
+    let body: {
+        result?: string;
+        data?: ExecutionResult;
+        errorCode?: string;
+        message?: string;
+    };
+    try {
+        body = await res.json();
+    } catch {
+        // The status is known here, unlike a transport error, so it is worth keeping.
+        throw new LexqError(res.status, null, `non-JSON response (${res.status})`);
+    }
+
     if (!res.ok || body.result !== "SUCCESS") {
         // The failure key is `errorCode`, not `code`. Reading the wrong one is invisible
         // at runtime: it is simply undefined, so every error arrives without a code.

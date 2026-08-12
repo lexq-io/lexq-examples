@@ -13,7 +13,7 @@ order. The LexQ API key stays on the server.
 1. `pnpm install`
 2. `cp .env.example .env` and fill in:
    - `LEXQ_API_URL` — `https://api.lexq.io`
-   - `LEXQ_API_KEY` — your API key
+   - `LEXQ_API_KEY` — your API key. The default **Execute only** scope is enough
    - `LEXQ_GROUP_ID` — the policy group to evaluate against
 3. `pnpm dev`
 4. Test it:
@@ -24,10 +24,11 @@ order. The LexQ API key stays on the server.
 
    The response carries the price LexQ returned and the trace handle for it:
 
-       {"orderId":"order-1","finalPrice":132000,"lexqTraceId":"c25dcd49-19c2-4365-8d06-cd4d5c953b0c"}
+       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"c25dcd49-19c2-4365-8d06-cd4d5c953b0c"}
 
-   `finalPrice` is whatever your deployed rules produced — 132000 here is a 12%
-   VIP discount on 150000. When no rule matches, `mutatedFacts` comes back empty
+   `finalPrice` is whatever your deployed rules produced — 135000 here is the 10%
+   VIP discount built in the [quickstart](https://docs.lexq.io/quickstart), applied
+   to 150000. When no rule matches, `mutatedFacts` comes back empty
    and the amount you sent is returned unchanged.
 
    When the policy needs a fact this service did not send, the code reaches you

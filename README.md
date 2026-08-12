@@ -11,6 +11,12 @@ a browser.
 - Base URL: `https://api.lexq.io/api/v1/execution`
 - Auth: every request sends an `x-api-key` header
 
+Create the key in the Console under **Management → API Keys**. The default
+**Execute only** scope is all these examples need, and it is the right one for a
+key embedded in your service. **Manage** exists for policy tooling such as the CLI,
+and granting it here would hand your application write access it never uses.
+See [API key scopes](https://docs.lexq.io/api/authentication#scope).
+
 LexQ has four execution modes. This repo's example uses **Single Group** —
 the standard path for evaluating one decision:
 
@@ -34,6 +40,11 @@ Full reference: https://docs.lexq.io/api/execution
 
 `facts` is required; `context` is optional metadata passed to actions. To see
 which facts a deployed policy needs: `GET /api/v1/execution/groups/{groupId}/requirements`.
+
+`Idempotency-Key` is capped at **255 characters**. LexQ rejects a longer key with
+`I-003` / `400` rather than truncating it, because two different keys must never
+collapse into one and replay each other's result. These examples pass the order ID
+straight through, so if your IDs can exceed that, hash them first.
 
 ### Response
 
