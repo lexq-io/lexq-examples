@@ -1,0 +1,68 @@
+# These examples are a hand-maintained copy of the LexQ contract. Nothing syncs
+# them when the engine changes, so the only thing standing between a contract
+# change and a reader pasting broken code is this workflow.
+#
+# It compiles both tracks. That will not catch a value that changed meaning, but
+# it does catch the failures that actually happen here: a response field that
+# disappeared, an enum that was renamed, a type that stopped lining up. Those are
+# the ones that reach a reader as a compile error in their own editor.
+#
+# No network calls to LexQ. A test that needs a live key and a deployed policy
+# cannot run on a fork's pull request, and a gate that only runs sometimes is not
+# a gate.
+
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm before Node: setup-node's pnpm cache needs the binary to exist.
+      # The lockfile is v9, and package.json carries no packageManager field,
+      # so the version is pinned here rather than left to corepack's default.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20 # the floor in package.json engines
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      # --frozen-lockfile: a drifted lockfile should fail here, not resolve to
+      # something the reader will never install.
+      - run: pnpm install --frozen-lockfile
+
+      # tsx strips types without checking them, so `pnpm dev` passing proves
+      # nothing about the contract. This is the check.
+      - run: pnpm typecheck
+
+  java:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: java
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17 # java.version in pom.xml
+          cache: maven
+
+      - run: ./mvnw -B -ntp compile
