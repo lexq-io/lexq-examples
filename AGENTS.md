@@ -41,7 +41,7 @@ Not in the code below — no track exercises them yet. Listed because porting a
 
 - **Accumulator facts need a caller-sent seed.** The engine is stateless, so a
   fact an action adds to must arrive with a starting value (e.g.
-  `"shipping_cost_usd": 0`). Omitting the seed changes decisions without erroring.
+  `"shippingCostUsd": 0`). Omitting the seed changes decisions without erroring.
 - **List-operator values are JSON arrays.** `HAS_ANY` / `HAS_ALL` / `HAS_NONE`
   take an array. A comma-joined string doesn't error — it evaluates to no match.
 

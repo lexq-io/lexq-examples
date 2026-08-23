@@ -13,7 +13,7 @@ app.post("/price", async (req, res) => {
     try {
         const result = await evaluate(
             // Facts your deployed policy expects — see GET /groups/{id}/requirements.
-            { payment_amount: paymentAmount, customer_tier: customerTier },
+            { paymentAmount, customerTier },
             // Idempotency: a retry of the same order won't execute twice.
             { idempotencyKey: orderId },
         );
@@ -24,7 +24,7 @@ app.post("/price", async (req, res) => {
 
         res.json({
             orderId,
-            finalPrice: result.mutatedFacts.payment_amount ?? paymentAmount,
+            finalPrice: result.mutatedFacts.paymentAmount ?? paymentAmount,
             lexqTraceId: result.traceId,
         });
     } catch (err) {

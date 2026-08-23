@@ -36,7 +36,7 @@ Full reference: https://docs.lexq.io/api/execution
     Content-Type: application/json
     Idempotency-Key: <your-order-id>      # optional — prevents duplicate execution
 
-    { "facts": { "payment_amount": 150000, "customer_tier": "VIP" }, "context": {} }
+    { "facts": { "paymentAmount": 150000, "customerTier": "VIP" }, "context": {} }
 
 `facts` is required; `context` is optional metadata passed to actions. To see
 which facts a deployed policy needs: `GET /api/v1/execution/groups/{groupId}/requirements`.
