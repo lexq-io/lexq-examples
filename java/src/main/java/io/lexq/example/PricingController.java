@@ -39,8 +39,8 @@ public class PricingController {
         // which required facts were absent, which is better than anything this method
         // could work out on its own.
         Map<String, Object> facts = new LinkedHashMap<>();
-        if (request.paymentAmount() != null) facts.put("payment_amount", request.paymentAmount());
-        if (request.customerTier() != null) facts.put("customer_tier", request.customerTier());
+        if (request.paymentAmount() != null) facts.put("paymentAmount", request.paymentAmount());
+        if (request.customerTier() != null) facts.put("customerTier", request.customerTier());
 
         // Idempotency: a retry of the same order will not execute twice.
         ExecutionResult result = lexq.evaluate(facts, request.orderId());
@@ -52,7 +52,7 @@ public class PricingController {
         // A fact only appears in mutatedFacts if a rule changed it. No matching discount
         // means no entry, and the amount the caller sent is already the final price.
         BigDecimal finalPrice = money(
-                result.mutatedFacts().getOrDefault("payment_amount", request.paymentAmount()));
+                result.mutatedFacts().getOrDefault("paymentAmount", request.paymentAmount()));
 
         return new PriceResponse(request.orderId(), finalPrice, result.traceId());
     }
