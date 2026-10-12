@@ -5,17 +5,17 @@ order. The LexQ API key stays on the server.
 
 ## Requirements
 
-- Node.js 20+ — the example uses the built-in `fetch`
-- pnpm (`corepack enable` ships it with Node)
+- Node.js 22 or later, and the npm that ships with it. The example uses the
+  built-in `fetch`, and Node's `--env-file` reads `.env`
 
 ## Run
 
-1. `pnpm install`
+1. `npm install`
 2. `cp .env.example .env` and fill in:
    - `LEXQ_API_URL` — `https://api.lexq.io`
    - `LEXQ_API_KEY` — your API key. The default **Execute only** scope is enough
    - `LEXQ_GROUP_ID` — the policy group to evaluate against
-3. `pnpm dev`
+3. `npm run dev`
 4. Test it:
 
        curl -X POST localhost:3000/price \

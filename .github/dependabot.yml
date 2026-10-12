@@ -16,7 +16,3 @@ updates:
     groups:
       actions:
         update-types: [minor, patch]
-    ignore:
-      # pnpm/action-setup v6 changes how pnpm is installed. Moving to it is a separate change.
-      - dependency-name: "pnpm/action-setup"
-        update-types: ["version-update:semver-major"]

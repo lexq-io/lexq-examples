@@ -30,26 +30,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # pnpm before Node: setup-node's pnpm cache needs the binary to exist.
-      # The lockfile is v9, and package.json carries no packageManager field,
-      # so the version is pinned here rather than left to corepack's default.
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
-        with:
-          version: 9
-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20 # the floor in package.json engines
-          cache: pnpm
-          cache-dependency-path: typescript/pnpm-lock.yaml
+          node-version: 22 # the floor in package.json engines
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
 
-      # --frozen-lockfile: a drifted lockfile should fail here, not resolve to
-      # something the reader will never install.
-      - run: pnpm install --frozen-lockfile
+      # npm ci fails when the lockfile no longer matches package.json, so CI checks the
+      # versions a reader actually installs.
+      - run: npm ci
 
-      # tsx strips types without checking them, so `pnpm dev` passing proves
+      # tsx strips types without checking them, so `npm run dev` passing proves
       # nothing about the contract. This is the check.
-      - run: pnpm typecheck
+      - run: npm run typecheck
 
   java:
     runs-on: ubuntu-26.04

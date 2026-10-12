@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.5</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -22,10 +22,17 @@
     </properties>
 
     <dependencies>
-        <!-- Brings in embedded Tomcat, Spring MVC, RestClient, and Jackson. -->
+        <!-- Embedded Tomcat, Spring MVC and Jackson, for the /price endpoint. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <!-- The auto-configured RestClient.Builder that LexqClient takes.
+             spring-boot-starter-webmvc does not include it, and without it the
+             application compiles but fails at startup. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
         </dependency>
     </dependencies>
 

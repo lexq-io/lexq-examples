@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import { evaluate, LexqError } from "./lexqClient.js";
 
@@ -8,7 +7,9 @@ app.use(express.json());
 // A pricing endpoint: asks LexQ to apply discount rules to an order.
 // The decision is made server-side; the LexQ API key never reaches a browser.
 app.post("/price", async (req, res) => {
-    const { orderId, paymentAmount, customerTier } = req.body;
+    // Express 5 leaves req.body undefined when the request is not JSON. Fall back to an
+    // empty object so the call still reaches LexQ, which names the missing facts (P-015).
+    const { orderId, paymentAmount, customerTier } = req.body ?? {};
 
     try {
         const result = await evaluate(
@@ -28,6 +29,8 @@ app.post("/price", async (req, res) => {
             lexqTraceId: result.traceId,
         });
     } catch (err) {
+        // Anything else is a bug in this service. Express 5 forwards an async handler's
+        // rejection to its error middleware, which answers 500.
         if (!(err instanceof LexqError)) throw err;
 
         // Not every LexQ failure is an upstream outage, so they must not all become 502.
@@ -69,4 +72,9 @@ app.post("/price", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("listening on :3000"));
+// Express 5 hands a listen failure such as EADDRINUSE to this callback instead of
+// crashing. A callback that ignores it reports "listening" and the process exits.
+app.listen(3000, (error) => {
+    if (error) throw error;
+    console.log("listening on :3000");
+});
