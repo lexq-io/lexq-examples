@@ -1,5 +1,5 @@
-# Line endings declared here — correct for every contributor,
-# independent of local git config.
+# Line endings are declared here so they come out right for every contributor,
+# whatever their local git config.
 
 * text=auto eol=lf
 *.cmd text eol=crlf

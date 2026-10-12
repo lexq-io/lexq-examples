@@ -31,11 +31,11 @@ public class PricingController {
 
     @PostMapping("/price")
     public PriceResponse price(@RequestBody PriceRequest request) {
-        // Facts the deployed policy expects — see GET /groups/{id}/requirements.
+        // Facts the deployed policy expects. See GET /groups/{id}/requirements.
         //
         // Built with put, not Map.of: Map.of rejects null values, so one absent request
         // field would throw a NullPointerException here and LexQ would never be called.
-        // Omit what is missing and let the engine answer instead — P-015 names exactly
+        // Omit what is missing and let the engine answer instead. P-015 names exactly
         // which required facts were absent, which is better than anything this method
         // could work out on its own.
         Map<String, Object> facts = new LinkedHashMap<>();
@@ -47,7 +47,7 @@ public class PricingController {
 
         // Correlate LexQ's audit trail with the order: store traceId next to the
         // record so the exact rules that priced it can be looked up later.
-        log.info("order {} priced — LexQ traceId {}", request.orderId(), result.traceId());
+        log.info("order {} priced, LexQ traceId {}", request.orderId(), result.traceId());
 
         // A fact only appears in mutatedFacts if a rule changed it. No matching discount
         // means no entry, and the amount the caller sent is already the final price.
@@ -73,7 +73,7 @@ public class PricingController {
 
     /**
      * Not every LexQ failure is an upstream outage, so they must not all become 502.
-     * LexQ's status classifies the failure and the error code names it — the full table
+     * LexQ's status classifies the failure and the error code names it. The full table
      * is at https://docs.lexq.io/api/execution#error-handling.
      */
     @ExceptionHandler(LexqExecutionException.class)
@@ -89,19 +89,20 @@ public class PricingController {
             // Branch on the code, not the status: I-001 and I-002 are both 409 and their
             // correct handling is opposite. I-002 says "try again later"; I-001 says the
             // key is already spent, so retrying it forever returns the same 409.
-            // A duplicate of an *identical* request never lands here at all — LexQ replays
+            // A duplicate of an *identical* request never lands here at all. LexQ replays
             // the original response with 200 and the same traceId.
             status = HttpStatus.SERVICE_UNAVAILABLE;
         } else if (lexqStatus < 500) {
-            // LexQ rejected *this service's* request — a missing fact (P-015), a malformed
-            // body (C-001), a group with no deployed version (P-019). Retrying it unchanged
-            // fails the same way, so paging the LexQ on-call would be wrong: the bug is here.
+            // LexQ rejected *this service's* request, for example a missing fact (P-015), a
+            // malformed body (C-001) or a group with no deployed version (P-019). Retrying
+            // it unchanged fails the same way. The fix belongs in this service, so do not
+            // report it as an upstream outage.
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         } else {
             status = HttpStatus.BAD_GATEWAY;
         }
 
-        log.error("rule evaluation failed — lexqStatus={} errorCode={}",
+        log.error("rule evaluation failed: lexqStatus={} errorCode={}",
                 lexqStatus, e.getErrorCode(), e);
 
         // Surface the code. It is the stable identifier callers and dashboards branch on;

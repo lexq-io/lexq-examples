@@ -1,6 +1,5 @@
-import "dotenv/config";
 import express from "express";
-import { evaluate, LexqError } from "./lexqClient.js";
+import { evaluate, LexqError, type Facts } from "./lexqClient.js";
 
 const app = express();
 app.use(express.json());
@@ -8,19 +7,25 @@ app.use(express.json());
 // A pricing endpoint: asks LexQ to apply discount rules to an order.
 // The decision is made server-side; the LexQ API key never reaches a browser.
 app.post("/price", async (req, res) => {
-    const { orderId, paymentAmount, customerTier } = req.body;
+    // Express 5 leaves req.body undefined when the request is not JSON. Fall back to an
+    // empty object so the call still reaches LexQ, which names the missing facts (P-015).
+    const { orderId, paymentAmount, customerTier } = req.body ?? {};
+
+    // Facts your deployed policy expects. See GET /groups/{id}/requirements.
+    //
+    // Omit what is missing, null included, and let LexQ answer instead. P-015 names
+    // exactly which required facts were absent.
+    const facts: Facts = {};
+    if (paymentAmount != null) facts.paymentAmount = paymentAmount;
+    if (customerTier != null) facts.customerTier = customerTier;
 
     try {
-        const result = await evaluate(
-            // Facts your deployed policy expects — see GET /groups/{id}/requirements.
-            { paymentAmount, customerTier },
-            // Idempotency: a retry of the same order won't execute twice.
-            { idempotencyKey: orderId },
-        );
+        // Idempotency: a retry of the same order won't execute twice.
+        const result = await evaluate(facts, { idempotencyKey: orderId });
 
         // Correlate LexQ's audit trail with your own records: store result.traceId
         // next to the order so you can later see exactly which rules priced it.
-        console.log(`order ${orderId} priced — LexQ traceId ${result.traceId}`);
+        console.log(`order ${orderId} priced, LexQ traceId ${result.traceId}`);
 
         res.json({
             orderId,
@@ -28,10 +33,12 @@ app.post("/price", async (req, res) => {
             lexqTraceId: result.traceId,
         });
     } catch (err) {
+        // Anything else is a bug in this service. Express 5 forwards an async handler's
+        // rejection to its error middleware, which answers 500.
         if (!(err instanceof LexqError)) throw err;
 
         // Not every LexQ failure is an upstream outage, so they must not all become 502.
-        // LexQ's status classifies the failure and the error code names it — the full
+        // LexQ's status classifies the failure and the error code names it. The full
         // table is at https://docs.lexq.io/api/execution#error-handling.
         let status: number;
         if (err.httpStatus === null) {
@@ -43,20 +50,21 @@ app.post("/price", async (req, res) => {
             // Branch on the code, not the status: I-001 and I-002 are both 409 and their
             // correct handling is opposite. I-002 says "try again later"; I-001 says the
             // key is already spent, so retrying it forever returns the same 409.
-            // A duplicate of an *identical* request never lands here at all — LexQ replays
+            // A duplicate of an *identical* request never lands here at all. LexQ replays
             // the original response with 200 and the same traceId.
             status = 503;
         } else if (err.httpStatus < 500) {
-            // LexQ rejected *this service's* request — a missing fact (P-015), a malformed
-            // body (C-001), a group with no deployed version (P-019). Retrying it unchanged
-            // fails the same way, so paging the LexQ on-call would be wrong: the bug is here.
+            // LexQ rejected *this service's* request, for example a missing fact (P-015), a
+            // malformed body (C-001) or a group with no deployed version (P-019). Retrying
+            // it unchanged fails the same way. The fix belongs in this service, so do not
+            // report it as an upstream outage.
             status = 500;
         } else {
             status = 502;
         }
 
         console.error(
-            `rule evaluation failed — lexqStatus=${err.httpStatus} errorCode=${err.errorCode}`,
+            `rule evaluation failed: lexqStatus=${err.httpStatus} errorCode=${err.errorCode}`,
             err,
         );
 
@@ -69,4 +77,9 @@ app.post("/price", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("listening on :3000"));
+// Express 5 hands a listen failure such as EADDRINUSE to this callback instead of
+// crashing. A callback that ignores it reports "listening" and the process exits.
+app.listen(3000, (error) => {
+    if (error) throw error;
+    console.log("listening on :3000");
+});

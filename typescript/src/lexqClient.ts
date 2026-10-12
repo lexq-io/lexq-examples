@@ -1,20 +1,27 @@
 // All LexQ HTTP communication is isolated in this file.
 // API reference: https://docs.lexq.io/api/execution
 
-export type Facts = Record<string, string | number | boolean>;
+// LIST_STRING and LIST_NUMBER facts travel as JSON arrays, never as joined strings.
+export type Facts = Record<string, string | number | boolean | string[] | number[]>;
 
 // Money and JavaScript numbers.
 //
-// LexQ computes amounts as decimals and sends the scale it rounded to (`132000.48`).
-// `JSON.parse` turns that into an IEEE-754 double. Reading the value and handing it
-// back out — what this example does — round-trips exactly, so the pricing endpoint is
-// safe as written.
+// LexQ does its arithmetic in decimal and rounds only where a rule sets `rounding`.
+// Otherwise an amount keeps up to 34 significant digits. `JSON.parse` turns it into an
+// IEEE-754 double. A decimal of up to 15 significant digits survives that round trip:
+// print the double again and you get the same digits. This example only reads the
+// amount and hands it back, so up to 15 digits it returns the same number, minus
+// trailing zeros (`135000.00` comes back as `135000`). Longer amounts change: a
+// three-way split of 100 arrives as 33.33333333333333333333333333333333 and leaves as
+// 33.333333333333336. Rules that produce money should set `rounding` for this reason
+// too.
 //
-// Arithmetic is not. `0.1 + 0.2` is the usual demonstration, and the error compounds
-// across a cart. If you total, split, or tax a decision amount, parse the response
-// body yourself and keep the amount as a string, then use a decimal library. The Java
-// track has BigDecimal and uses it end to end; this is the one place the two tracks
-// cannot match, because the language has no decimal type.
+// Arithmetic loses precision even on short amounts. `0.1 + 0.2` is the usual
+// demonstration, and the error compounds across a cart. If you total, split, or tax a
+// decision amount, parse the response body yourself and keep the amount as a string,
+// then use a decimal library. The Java track has BigDecimal and uses it end to end;
+// this is the one place the two tracks cannot match, because the language has no
+// decimal type.
 
 export interface ExecutionTrace {
     tenantId: string;
@@ -52,7 +59,7 @@ export interface ExecutionResult {
  * Thrown when LexQ returns result !== "SUCCESS", or when the call fails in transit.
  *
  * Both the HTTP status and the error code are kept: the status classifies the failure,
- * the code names it. Callers need the code to branch — see the table at
+ * the code names it. Callers need the code to branch. The error code table is at
  * https://docs.lexq.io/api/execution#error-handling.
  */
 export class LexqError extends Error {
@@ -61,7 +68,7 @@ export class LexqError extends Error {
         readonly httpStatus: number | null,
         /**
          * The LexQ error code (e.g. "P-015"), or null for a transport error.
-         * This is the value to branch on — it is stable, the message is not.
+         * Branch on this value. Codes stay stable, while messages may be reworded.
          */
         readonly errorCode: string | null,
         message: string,
@@ -87,7 +94,7 @@ export async function evaluate(
 
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        // The API key lives on the server only — it never ships to a browser.
+        // The API key lives on the server only. It never ships to a browser.
         "x-api-key": apiKey,
     };
     if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
@@ -100,12 +107,12 @@ export async function evaluate(
             body: JSON.stringify({ facts, context: options.context ?? {} }),
         });
     } catch (cause) {
-        // No status — the request never reached LexQ.
+        // No status: the request never reached LexQ.
         throw new LexqError(null, null, `transport error: ${(cause as Error).message}`);
     }
 
     // Not every response is JSON. A load balancer returning 502, or a 404 from a
-    // wrong base URL, sends HTML — and res.json() throws a SyntaxError on it. Left
+    // wrong base URL, sends HTML, and res.json() throws a SyntaxError on it. Left
     // uncaught that error escapes as-is, so the caller's `instanceof LexqError`
     // check misses it and the failure surfaces as an unhandled 500 instead of a
     // classified one. The Java track gets this for free: RestClient wraps a

@@ -4,16 +4,16 @@ server:
 spring:
   jackson:
     deserialization:
-      # Decision outputs are money. Without this, Jackson reads a JSON decimal into a
-      # Double and the scale the engine computed (HALF_UP, 2) is gone before your code
-      # sees it. LexQ preserves that scale on the wire; losing it here defeats the point
-      # of an auditable decision.
+      # Decision amounts here are money. Without this, Jackson reads a JSON decimal into
+      # a Double, which keeps about 15 significant digits. LexQ computes in decimal and
+      # rounds only where a rule sets `rounding`, so a result can be longer than that, and
+      # the price this service returns would differ from the one LexQ decided.
       use-big-decimal-for-floats: true
 
 lexq:
   # https://api.lexq.io
   api-url: ${LEXQ_API_URL:https://api.lexq.io}
-  # your API key — keep it on the server, never ship it to a browser
+  # your API key, kept on the server and never shipped to a browser
   api-key: ${LEXQ_API_KEY}
   # the policy group to evaluate against
   group-id: ${LEXQ_GROUP_ID}

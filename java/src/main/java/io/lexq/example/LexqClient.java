@@ -22,7 +22,7 @@ public class LexqClient {
 
     /**
      * Claim every status for a handler that does nothing, which stops RestClient from
-     * throwing on 4xx/5xx — {@link #evaluate} inspects the LexQ envelope instead.
+     * throwing on 4xx/5xx. {@link #evaluate} inspects the LexQ envelope instead.
      *
      * <p>The predicate selects which statuses this handler owns, not which ones count as
      * errors. A predicate that matches nothing leaves Spring's default handler in place,
@@ -37,8 +37,8 @@ public class LexqClient {
     /**
      * Takes Spring Boot's auto-configured {@code RestClient.Builder} rather than
      * {@code RestClient.builder()}. The injected one carries the application's Jackson
-     * setup, which is where {@code use-big-decimal-for-floats} lives — build a client
-     * from the static factory and decision amounts come back as {@code Double}.
+     * setup, which is where {@code use-big-decimal-for-floats} lives. A client built
+     * from the static factory reads decision amounts as {@code Double}.
      */
     LexqClient(LexqProperties props, RestClient.Builder builder) {
         this.apiKey = props.apiKey();
@@ -67,7 +67,7 @@ public class LexqClient {
         try {
             response = restClient.post()
                     .uri("/api/v1/execution/groups/{groupId}", groupId)
-                    // The API key lives on the server only — it never ships to a browser.
+                    // The API key lives on the server only. It never ships to a browser.
                     .header("x-api-key", apiKey)
                     .headers(headers -> {
                         if (idempotencyKey != null) {
@@ -81,7 +81,7 @@ public class LexqClient {
                     // exception handler needs it. body() would discard it.
                     .toEntity(ExecutionEnvelope.class);
         } catch (RestClientException e) {
-            // No status — the request never reached LexQ.
+            // No status: the request never reached LexQ.
             throw new LexqExecutionException(null, null, "transport error: " + e.getMessage());
         }
 
