@@ -4,8 +4,8 @@ package io.lexq.example;
  * Thrown when LexQ returns result != SUCCESS, or when the call fails in transit.
  *
  * <p>Both the HTTP status and the LexQ error code are kept: the status classifies the
- * failure, the code names it. Callers need the code to branch — see the table at
- * https://docs.lexq.io/api/execution#error-handling.
+ * failure, the code names it. Callers need the code to branch. The error code table
+ * is at https://docs.lexq.io/api/execution#error-handling.
  */
 public class LexqExecutionException extends RuntimeException {
 

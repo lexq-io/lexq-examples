@@ -1,7 +1,9 @@
-# LexQ integration example — TypeScript
+# LexQ integration example: TypeScript (Node.js, Express)
 
 A minimal backend service that calls the LexQ Execution API to price an
 order. The LexQ API key stays on the server.
+
+For AI agents porting this code: the contract to keep is in [AGENTS.md](../AGENTS.md).
 
 ## Requirements
 
@@ -12,9 +14,9 @@ order. The LexQ API key stays on the server.
 
 1. `npm install`
 2. `cp .env.example .env` and fill in:
-   - `LEXQ_API_URL` — `https://api.lexq.io`
-   - `LEXQ_API_KEY` — your API key. The default **Execute only** scope is enough
-   - `LEXQ_GROUP_ID` — the policy group to evaluate against
+   - `LEXQ_API_URL`: `https://api.lexq.io`
+   - `LEXQ_API_KEY`: your API key. The default **Execute only** scope is enough
+   - `LEXQ_GROUP_ID`: the policy group to evaluate against
 3. `npm run dev`
 4. Test it:
 
@@ -24,19 +26,20 @@ order. The LexQ API key stays on the server.
 
    The response carries the price LexQ returned and the trace handle for it:
 
-       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"c25dcd49-19c2-4365-8d06-cd4d5c953b0c"}
+       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"331bb7af-efdc-465a-be15-a28a652a436a"}
 
-   `finalPrice` is whatever your deployed rules produced — 135000 here is the 10%
-   VIP discount built in the [quickstart](https://docs.lexq.io/quickstart), applied
-   to 150000. When no rule matches, `mutatedFacts` comes back empty
-   and the amount you sent is returned unchanged.
+   `finalPrice` is whatever your deployed rules produced. The
+   [quickstart](https://docs.lexq.io/quickstart) policy takes 10% off any order of
+   100000 or more, so it returns 135000 for 150000. When no rule matches,
+   `mutatedFacts` comes back empty and the amount you sent is returned unchanged.
 
-   When the policy needs a fact this service did not send, the code reaches you
-   instead of a bare failure:
+   When the policy needs a fact this service did not send, you get LexQ's error
+   code instead of a bare failure. Send the request again as `order-2`, so the
+   idempotency key is new, and leave out `paymentAmount`:
 
        {"error":"rule evaluation failed","lexqErrorCode":"P-015"}
 
 ## Where to look
 
-- `src/lexqClient.ts` — the only file that talks to LexQ
-- `src/server.ts` — the pricing endpoint that uses it
+- `src/lexqClient.ts`: the only file that talks to LexQ
+- `src/server.ts`: the pricing endpoint that uses it

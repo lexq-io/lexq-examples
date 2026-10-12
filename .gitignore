@@ -7,7 +7,7 @@ target/
 out/
 *.class
 
-# Environment — .env.example stays tracked, do not broaden to .env*
+# Environment files. The pattern is exactly .env so that .env.example stays tracked.
 .env
 
 # IDE / editors

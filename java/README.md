@@ -1,14 +1,16 @@
-# LexQ integration example — Java (Spring Boot)
+# LexQ integration example: Java (Spring Boot)
 
 A minimal backend service that calls the LexQ Execution API to price an
 order. The LexQ API key stays on the server.
+
+For AI agents porting this code: the contract to keep is in [AGENTS.md](../AGENTS.md).
 
 ## Requirements
 
 - Java 17+
 
 The Maven Wrapper (`./mvnw`) is included, so a separate Maven install is not
-needed — the wrapper downloads Maven on first run.
+needed. The wrapper downloads Maven on first run.
 
 ## Run
 
@@ -27,21 +29,23 @@ needed — the wrapper downloads Maven on first run.
 
    The response carries the price LexQ returned and the trace handle for it:
 
-       {"orderId":"order-1","finalPrice":135000.00,"lexqTraceId":"c35c3116-6076-48ff-a328-b63cc2ec217a"}
+       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"6783994d-36f1-49af-a98e-c35279718f48"}
 
-   `finalPrice` is whatever your deployed rules produced — 135000.00 here is the 10%
-   VIP discount built in the [quickstart](https://docs.lexq.io/quickstart), applied
-   to 150000. Amounts are `BigDecimal` end to end, so the scale the
-   engine rounded to survives the trip. When no rule matches, `mutatedFacts` comes
-   back empty and the amount you sent is returned at the scale you sent it.
+   `finalPrice` is whatever your deployed rules produced. The
+   [quickstart](https://docs.lexq.io/quickstart) policy takes 10% off any order of
+   100000 or more, so it returns 135000 for 150000. Amounts are `BigDecimal` end to
+   end, so every digit the engine computed survives the trip, even in results too
+   long for a double. When no rule matches, `mutatedFacts` comes back empty and the
+   amount you sent is returned at the scale you sent it.
 
-   When the policy needs a fact this service did not send, the code reaches you
-   instead of a bare failure:
+   When the policy needs a fact this service did not send, you get LexQ's error
+   code instead of a bare failure. Send the request again as `order-2`, so the
+   idempotency key is new, and leave out `paymentAmount`:
 
        {"error":"rule evaluation failed","lexqErrorCode":"P-015"}
 
 ## Where to look
 
-- `LexqClient.java` — the only file that talks to LexQ
-- `PricingController.java` — the pricing endpoint that uses it
-- `LexqProperties.java` — the three environment values, bound at startup
+- `LexqClient.java`: the only file that talks to LexQ
+- `PricingController.java`: the pricing endpoint that uses it
+- `LexqProperties.java`: the three environment values, bound at startup
