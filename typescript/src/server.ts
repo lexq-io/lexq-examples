@@ -1,5 +1,5 @@
 import express from "express";
-import { evaluate, LexqError } from "./lexqClient.js";
+import { evaluate, LexqError, type Facts } from "./lexqClient.js";
 
 const app = express();
 app.use(express.json());
@@ -11,13 +11,17 @@ app.post("/price", async (req, res) => {
     // empty object so the call still reaches LexQ, which names the missing facts (P-015).
     const { orderId, paymentAmount, customerTier } = req.body ?? {};
 
+    // Facts your deployed policy expects. See GET /groups/{id}/requirements.
+    //
+    // Omit what is missing, null included, and let LexQ answer instead. P-015 names
+    // exactly which required facts were absent.
+    const facts: Facts = {};
+    if (paymentAmount != null) facts.paymentAmount = paymentAmount;
+    if (customerTier != null) facts.customerTier = customerTier;
+
     try {
-        const result = await evaluate(
-            // Facts your deployed policy expects — see GET /groups/{id}/requirements.
-            { paymentAmount, customerTier },
-            // Idempotency: a retry of the same order won't execute twice.
-            { idempotencyKey: orderId },
-        );
+        // Idempotency: a retry of the same order won't execute twice.
+        const result = await evaluate(facts, { idempotencyKey: orderId });
 
         // Correlate LexQ's audit trail with your own records: store result.traceId
         // next to the order so you can later see exactly which rules priced it.

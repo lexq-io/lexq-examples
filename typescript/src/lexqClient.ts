@@ -1,7 +1,8 @@
 // All LexQ HTTP communication is isolated in this file.
 // API reference: https://docs.lexq.io/api/execution
 
-export type Facts = Record<string, string | number | boolean>;
+// LIST_STRING and LIST_NUMBER facts travel as JSON arrays, never as joined strings.
+export type Facts = Record<string, string | number | boolean | string[] | number[]>;
 
 // Money and JavaScript numbers.
 //
