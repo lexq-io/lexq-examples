@@ -17,15 +17,14 @@ key embedded in your service. **Manage** exists for policy tooling such as the C
 and granting it here would hand your application write access it never uses.
 See [API key scopes](https://docs.lexq.io/api/authentication#scope).
 
-LexQ has four execution modes. This repo's example uses **Single Group**, the
+LexQ has three execution modes. This repo's example uses **Single Group**, the
 standard path for evaluating one decision:
 
-| Mode             | Endpoint                                      |
-| ---------------- | --------------------------------------------- |
-| Single Group     | `POST /groups/{groupId}`                      |
-| Specific Version | `POST /groups/{groupId}/versions/{versionId}` |
-| Batch            | `POST /groups/{groupId}/batch`                |
-| Composite        | `POST /composite`                             |
+| Mode         | Endpoint                       |
+| ------------ | ------------------------------ |
+| Single Group | `POST /groups/{groupId}`       |
+| Batch        | `POST /groups/{groupId}/batch` |
+| Composite    | `POST /composite`              |
 
 Full reference: https://docs.lexq.io/api/execution
 
