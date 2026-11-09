@@ -74,9 +74,9 @@ These properties are what the examples teach. Keep them when you port the code:
   input.** `mutatedFacts` holds facts a rule changed. Keys the request did not send,
   such as a `SET_FACT` target or `isBlocked`, arrive in `generatedVariables`. A key in
   neither means no rule changed it, and the value the caller sent stands.
-- **Keep decision amounts decimal.** LexQ calculates in decimal and can return up to
-  34 significant digits. Java: Jackson's `USE_BIG_DECIMAL_FOR_FLOATS`, applied through
-  Spring Boot's injected `RestClient.Builder` (a client built with
+- **Keep decision amounts decimal.** LexQ calculates in decimal, and an amount can
+  carry 34 significant digits or more. Java: Jackson's `USE_BIG_DECIMAL_FOR_FLOATS`,
+  applied through Spring Boot's injected `RestClient.Builder` (a client built with
   `RestClient.builder()` reads doubles). Python: read with
   `response.json(parse_float=Decimal)`, which works with `httpx` and `requests`, and
   send amounts as JSON numbers. `json.dumps` rejects `Decimal`, and `default=str`
@@ -133,8 +133,6 @@ LexQ does not report these as errors. When a decision looks wrong, read
   step may be implied.
 - **Link only what readers can open.** Point to docs.lexq.io, never to an internal
   document.
-- **Write commits in English.** Use `type: description`, with no tool attribution in
-  commit messages or PR bodies. `.claude/settings.json` turns attribution off for
-  Claude Code. Remove it by hand if your tool adds its own.
+- **Write commits in English.** Use `type: description`.
 
 Run commands and versions live in each track's README and build file, not here.
