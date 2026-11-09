@@ -105,6 +105,12 @@ export async function evaluate(
             method: "POST",
             headers,
             body: JSON.stringify({ facts, context: options.context ?? {} }),
+            // Do not follow redirects. fetch follows them by default and sends the
+            // x-api-key header to whatever host the Location header names, and on a 307
+            // or 308 the body too. With "manual", a 3xx comes back as it is and fails with
+            // its status like any other error response. The usual cause of a 3xx is a
+            // wrong LEXQ_API_URL: http://api.lexq.io answers with a 301 to https.
+            redirect: "manual",
         });
     } catch (cause) {
         // No status: the request never reached LexQ.
@@ -115,8 +121,7 @@ export async function evaluate(
     // wrong base URL, sends HTML, and res.json() throws a SyntaxError on it. Left
     // uncaught that error escapes as-is, so the caller's `instanceof LexqError`
     // check misses it and the failure surfaces as an unhandled 500 instead of a
-    // classified one. The Java track gets this for free: RestClient wraps a
-    // deserialization failure in RestClientException, which is already caught above.
+    // classified one.
     let body: {
         result?: string;
         data?: ExecutionResult;
