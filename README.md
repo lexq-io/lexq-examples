@@ -74,3 +74,11 @@ exactly which rules produced this decision.
 
 - [`typescript/`](./typescript): a runnable pricing service in Node.js (Express)
 - [`java/`](./java): the same pricing service in Spring Boot
+
+## Maintenance
+
+I'm Sanghyun Park, and I maintain these examples. I write most of the code,
+comments, commit messages and pull request descriptions with AI coding tools,
+mainly Claude Code. I decide each change, read every commit and diff before it is
+pushed, and merge every pull request myself. The sample responses in `java/` and
+`typescript/` come from runs against a LexQ test tenant.

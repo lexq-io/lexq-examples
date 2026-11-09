@@ -133,8 +133,6 @@ LexQ does not report these as errors. When a decision looks wrong, read
   step may be implied.
 - **Link only what readers can open.** Point to docs.lexq.io, never to an internal
   document.
-- **Write commits in English.** Use `type: description`, with no tool attribution in
-  commit messages or PR bodies. `.claude/settings.json` turns attribution off for
-  Claude Code. Remove it by hand if your tool adds its own.
+- **Write commits in English.** Use `type: description`.
 
 Run commands and versions live in each track's README and build file, not here.
