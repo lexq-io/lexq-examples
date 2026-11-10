@@ -59,6 +59,11 @@ These properties are what the examples teach. Keep them when you port the code:
 - **Treat a body that is not JSON as a failure, and keep its status.** A load
   balancer's 502 page or the 404 from a wrong host is HTML, and a JSON parser throws
   on it.
+- **Do not follow redirects, and treat a 3xx as a failure that keeps its status.** A
+  client that follows one sends the `x-api-key` header to the host in the `Location`
+  header, and on a 307 or 308 the request body as well. `fetch` and Spring Boot's
+  auto-configured `RestClient` both follow redirects by default. A 3xx usually means
+  the API URL is wrong: `http://api.lexq.io` answers with a 301 to `https`.
 - **Handle both envelope branches.** `result` says which one you have. `"SUCCESS"`
   carries `data`, and `"ERROR"` carries `errorCode` and `message`. Both tracks treat
   any `result` other than `SUCCESS` as a failure, whatever the HTTP status. The key is
@@ -68,8 +73,8 @@ These properties are what the examples teach. Keep them when you port the code:
   Retry `I-002` later, because a request with the same key is still running. Never
   retry `I-001` with the same key, because that key already served a different body.
   Both tracks answer 503 for 429 and `I-002`, 502 when LexQ was not reached or
-  answered with a 5xx, and 500 for any other 4xx, because the fix belongs in the
-  calling service.
+  answered with a 5xx, and 500 for a 3xx or any other 4xx, because the fix belongs in
+  the calling service.
 - **Read results from `mutatedFacts` and `generatedVariables`, and fall back to the
   input.** `mutatedFacts` holds facts a rule changed. Keys the request did not send,
   such as a `SET_FACT` target or `isBlocked`, arrive in `generatedVariables`. A key in

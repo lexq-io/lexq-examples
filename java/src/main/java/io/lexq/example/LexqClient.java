@@ -1,12 +1,16 @@
 package io.lexq.example;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.UnknownContentTypeException;
 
 import java.util.List;
 import java.util.Map;
@@ -39,12 +43,26 @@ public class LexqClient {
      * {@code RestClient.builder()}. The injected one carries the application's Jackson
      * setup, which is where {@code use-big-decimal-for-floats} lives. A client built
      * from the static factory reads decision amounts as {@code Double}.
+     *
+     * <p>Spring Boot built the injected builder's request factory from
+     * {@code requestFactoryBuilder} and {@code httpClientSettings}. Building a new factory
+     * from the same two keeps the application's HTTP client settings, such as timeouts,
+     * and changes only how redirects are handled.
      */
-    LexqClient(LexqProperties props, RestClient.Builder builder) {
+    LexqClient(LexqProperties props, RestClient.Builder builder,
+               ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+               HttpClientSettings httpClientSettings) {
         this.apiKey = props.apiKey();
         this.groupId = props.groupId();
         this.restClient = builder
                 .baseUrl(props.apiUrl())
+                // Do not follow redirects. Spring Boot follows them by default and sends the
+                // x-api-key header to whatever host the Location header names, and on a 307
+                // or 308 the body too. With DONT_FOLLOW, a 3xx reaches evaluate() and fails
+                // with its status. The usual cause of a 3xx is a wrong LEXQ_API_URL:
+                // http://api.lexq.io answers with a 301 to https.
+                .requestFactory(requestFactoryBuilder.build(
+                        httpClientSettings.withRedirects(HttpRedirects.DONT_FOLLOW)))
                 // A non-2xx status and a 2xx body with result != SUCCESS are both
                 // handled explicitly in evaluate(); disable RestClient's default throw.
                 .defaultStatusHandler(ALL, (request, response) -> { })
@@ -80,13 +98,19 @@ public class LexqClient {
                     // toEntity, not body: the HTTP status classifies the failure and the
                     // exception handler needs it. body() would discard it.
                     .toEntity(ExecutionEnvelope.class);
+        } catch (UnknownContentTypeException e) {
+            // Not every response is JSON. A load balancer's 502 page, or the 404 from a
+            // wrong base URL, is HTML, and no converter reads HTML into the envelope. The
+            // status is known here, unlike a transport error, so it is worth keeping.
+            throw new LexqExecutionException(e.getStatusCode().value(), null, "non-JSON response");
         } catch (RestClientException e) {
-            // No status: the request never reached LexQ.
+            // No status: the request never reached LexQ, or its response could not be read.
             throw new LexqExecutionException(null, null, "transport error: " + e.getMessage());
         }
 
         ExecutionEnvelope envelope = response.getBody();
-        if (envelope == null || !"SUCCESS".equals(envelope.result())) {
+        if (envelope == null || !response.getStatusCode().is2xxSuccessful()
+                || !"SUCCESS".equals(envelope.result())) {
             throw new LexqExecutionException(
                     response.getStatusCode().value(),
                     envelope != null ? envelope.errorCode() : null,
