@@ -1,12 +1,16 @@
 # AGENTS.md: LexQ Examples
 
-> **For AI agents and AI-powered IDEs** (Claude Code, Cursor, Windsurf, Cline, Gemini CLI, and others).
-> Humans: start with the README in each track.
-
 These examples show a backend service calling [LexQ](https://lexq.io). Both tracks,
 `java/` (Spring Boot) and `typescript/` (Node.js, Express), build the same pricing
 endpoint. It takes an order, sends its values to LexQ as `facts`, and returns the
-price LexQ decided. The API key stays on the server.
+price LexQ decided.
+
+Read these before you port the client or change this repository:
+
+- [Porting Contract](README.md#porting-contract): what a port must keep
+- [Mistakes that still return 200](README.md#mistakes-that-still-return-200): what
+  LexQ does not report as an error
+- [CONTRIBUTING.md](CONTRIBUTING.md): the rules for changing these examples
 
 ## Integrating LexQ into a user's service
 
@@ -31,7 +35,7 @@ price LexQ decided. The API key stays on the server.
    The endpoint that calls it ([`server.ts`](typescript/src/server.ts),
    [`PricingController.java`](java/src/main/java/io/lexq/example/PricingController.java))
    builds the facts and maps LexQ failures to HTTP statuses. Keep every property in the
-   Porting Contract.
+   [Porting Contract](README.md#porting-contract).
 4. Call `POST /api/v1/execution/groups/{groupId}` where the decision is needed, with
    `{"facts": {...}}` and an `Idempotency-Key` that identifies this exact request, such
    as the order ID. Store `data.traceId` with the record the decision applies to, such
@@ -45,106 +49,3 @@ The API reference is also served as Markdown:
 [Execution API](https://docs.lexq.io/api/execution.md),
 [error codes](https://docs.lexq.io/api/errors.md),
 [page index](https://docs.lexq.io/llms.txt).
-
-## Porting Contract
-
-These properties are what the examples teach. Keep them when you port the code:
-
-- **Stop the HTTP client from throwing on error statuses.** LexQ reports failures in
-  the response body, for 5xx as well as 4xx, so the client has to return the body for
-  every status. Spring's `RestClient` throws by default, and `axios` rejects anything
-  outside 2xx. `requests` and `httpx` raise only when you call `raise_for_status()`.
-  If the client throws, every LexQ error arrives as a transport failure with no status
-  and no code.
-- **Treat a body that is not JSON as a failure, and keep its status.** A load
-  balancer's 502 page or the 404 from a wrong host is HTML, and a JSON parser throws
-  on it.
-- **Do not follow redirects, and treat a 3xx as a failure that keeps its status.** A
-  client that follows one sends the `x-api-key` header to the host in the `Location`
-  header, and on a 307 or 308 the request body as well. `fetch` and Spring Boot's
-  auto-configured `RestClient` both follow redirects by default. A 3xx usually means
-  the API URL is wrong: `http://api.lexq.io` answers with a 301 to `https`.
-- **Handle both envelope branches.** `result` says which one you have. `"SUCCESS"`
-  carries `data`, and `"ERROR"` carries `errorCode` and `message`. Both tracks treat
-  any `result` other than `SUCCESS` as a failure, whatever the HTTP status. The key is
-  `errorCode`, not `code`, and reading the wrong key fails silently: every error
-  arrives without a code.
-- **Branch on `errorCode`, not on the HTTP status.** `I-001` and `I-002` are both 409.
-  Retry `I-002` later, because a request with the same key is still running. Never
-  retry `I-001` with the same key, because that key already served a different body.
-  Both tracks answer 503 for 429 and `I-002`, 502 when a call did not reach LexQ, ran
-  out of time or got a 5xx, and 500 for a 3xx or any other 4xx, because the fix
-  belongs in the calling service.
-- **Read results from `mutatedFacts` and `generatedVariables`, and fall back to the
-  input.** `mutatedFacts` holds facts a rule changed. Keys the request did not send,
-  such as a `SET_FACT` target or `isBlocked`, arrive in `generatedVariables`. A key in
-  neither means no rule changed it, and the value the caller sent stands.
-- **Keep decision amounts decimal.** LexQ calculates in decimal, and an amount can
-  carry 34 significant digits or more. Java: Jackson's `USE_BIG_DECIMAL_FOR_FLOATS`,
-  applied through Spring Boot's injected `RestClient.Builder` (a client built with
-  `RestClient.builder()` reads doubles). Python: read with
-  `response.json(parse_float=Decimal)`, which works with `httpx` and `requests`, and
-  send amounts as JSON numbers. `json.dumps` rejects `Decimal`, and `default=str`
-  turns it into a string that no rule matches. Go: `json.Decoder.UseNumber()`.
-  JavaScript has no decimal type, and the comment near the top of `lexqClient.ts` says
-  when that matters.
-- **Leave out a value you do not have instead of sending `null`.** Both tracks drop
-  missing fields, and LexQ answers `P-015` with their names. In Python, drop `None`
-  values before sending, for example with Pydantic's `model_dump(exclude_none=True)`.
-- **Keep the API key on the server.** It goes in the `x-api-key` header, not in
-  `Authorization`, and only from a backend.
-- **Keep the idempotency key and the traceId.** A retry with the same key and the same
-  body does not execute twice and returns the original traceId. The same key with a
-  different body fails with `I-001`, so pricing a changed order again needs a new key.
-  Keys are capped at 255 characters and are recorded with the execution, so hash long
-  IDs and keep personal data out of them.
-- **Put a time limit on every call, retry with the same key, and agree on the
-  fallback.** Each attempt gets up to 5 seconds, and a call makes at most 3 attempts
-  within 15 seconds. Both tracks retry when no complete response arrives, on a 502,
-  503, 504 or 429, and on `I-002`, waiting at least 1 second, then at least 2. Every
-  attempt sends the same `Idempotency-Key` and the same body, and a call without a key
-  makes its own. If an earlier attempt succeeded, LexQ answers the retry with its
-  stored response and does not bill it. Ask the user whether their flow should fail
-  when the attempts run out, as the examples do, or continue with a default decision.
-  [When LexQ Is Slow or Unavailable](https://docs.lexq.io/api/execution.md#when-lexq-is-slow-or-unavailable)
-  in the docs says what to do about each kind of failure.
-- **Carry over the comments that explain the LexQ contract.** Leave behind the ones
-  about the source language, such as the JavaScript number note.
-
-## Mistakes that still return 200
-
-LexQ does not report these as errors. When a decision looks wrong, read
-`decisionTraces` in the response. Each rule's entry says whether it fired and why.
-
-- **Send each fact in its declared type.** A number sent as a string (`"150000"`) does
-  not match, and neither does a `LIST_STRING` or `LIST_NUMBER` fact sent as a
-  comma-joined string instead of a JSON array. The rule does not fire, and its
-  `decisionTraces[].reasonDetail` reads `Evaluation error: FACT_TYPE_MISMATCH`.
-- **Check `isBlocked`.** A `BLOCK` action neither fails the call nor stops other
-  rules. It sets `isBlocked` in `generatedVariables`, and the caller has to enforce it.
-- **Use a stable `contexts.trafficKey` when A/B testing.** While a test is running, a
-  request without it always gets the current version, so the test version receives no
-  traffic. Use one opaque value per customer, such as a hashed customer ID. The order
-  ID, or anything else that changes per request, splits one customer across both
-  versions. Routing reads only `contexts`, so a `trafficKey` in `facts` is ignored.
-
-## Authoring Contract: changing this repo
-
-- **Run every example before it lands.** Run it against a live tenant, and paste
-  expected outputs in READMEs and comments from real runs, never from memory.
-- **Sanitize pasted output.** API keys, tenant IDs and user IDs become placeholders.
-  Decision payloads stay exactly as they came back.
-- **Keep the tracks in lock-step.** Every track implements the same scenario with the
-  same envelope handling. A contract-level fix lands in every track in the same PR, or
-  the PR says why not.
-- **Leave no IDE warnings.** Each track is clean under its default inspection profile.
-  Readers copy warnings along with the code.
-- **Use common dependencies.** Stick to the stack defaults most developers already
-  know, so the example teaches LexQ rather than a library.
-- **Keep it runnable from the README.** Clone, set the environment variables, run. No
-  step may be implied.
-- **Link only what readers can open.** Point to docs.lexq.io, never to an internal
-  document.
-- **Write commits in English.** Use `type: description`.
-
-Run commands and versions live in each track's README and build file, not here.

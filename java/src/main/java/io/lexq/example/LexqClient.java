@@ -195,11 +195,6 @@ public class LexqClient {
                 || "I-002".equals(e.getErrorCode());
     }
 
-    // ── Execution API contract ──────────────────────────────────────────────
-    // Nested on purpose: these records exist only as this client's wire types.
-    // ExecutionEnvelope is internal plumbing (private); the rest are the
-    // response contract returned to callers (public).
-
     /**
      * The internal wrapper around every response. The success branch carries {@code data};
      * the failure branch carries {@code errorCode} + {@code message}.

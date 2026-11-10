@@ -1,9 +1,9 @@
 # LexQ integration example: Java (Spring Boot)
 
 A minimal backend service that calls the LexQ Execution API to price an
-order. The LexQ API key stays on the server.
+order.
 
-For AI agents porting this code: the contract to keep is in [AGENTS.md](../AGENTS.md).
+When you port this code, keep the [Porting Contract](../README.md#porting-contract).
 
 ## Requirements
 
