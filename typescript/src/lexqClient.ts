@@ -24,15 +24,12 @@ export type Facts = Record<string, string | number | boolean | string[] | number
 // decimal type.
 
 export interface ExecutionTrace {
-    tenantId: string;
     policyGroupId: string;
     policyVersionId: string;
     ruleId: string;
     ruleName: string;
-    executedAt: string;
     matched: boolean;
     matchExpression: string;
-    inputFacts: Record<string, unknown>;
     generatedActions: unknown[];
 }
 
@@ -48,7 +45,10 @@ export interface DecisionTrace {
 
 export interface ExecutionResult {
     traceId: string;
+    executedAt: string;
+    totalProcessingTimeMs: number;
     inputFacts: Facts;
+    inputContexts: Record<string, unknown>;
     mutatedFacts: Facts;
     generatedVariables: Record<string, unknown>;
     executionTraces: ExecutionTrace[];
@@ -79,7 +79,7 @@ export class LexqError extends Error {
 }
 
 interface EvaluateOptions {
-    context?: Record<string, unknown>;
+    contexts?: Record<string, unknown>;
     // Pass a stable key (e.g. your order ID) so a retry does not execute twice.
     idempotencyKey?: string;
 }
@@ -104,7 +104,7 @@ export async function evaluate(
         res = await fetch(`${apiUrl}/api/v1/execution/groups/${groupId}`, {
             method: "POST",
             headers,
-            body: JSON.stringify({ facts, context: options.context ?? {} }),
+            body: JSON.stringify({ facts, contexts: options.contexts ?? {} }),
             // Do not follow redirects. fetch follows them by default and sends the
             // x-api-key header to whatever host the Location header names, and on a 307
             // or 308 the body too. With "manual", a 3xx comes back as it is and fails with

@@ -115,11 +115,11 @@ LexQ does not report these as errors. When a decision looks wrong, read
   `decisionTraces[].reasonDetail` reads `Evaluation error: FACT_TYPE_MISMATCH`.
 - **Check `isBlocked`.** A `BLOCK` action neither fails the call nor stops other
   rules. It sets `isBlocked` in `generatedVariables`, and the caller has to enforce it.
-- **Use a stable `context.trafficKey` when A/B testing.** While a test is running, a
+- **Use a stable `contexts.trafficKey` when A/B testing.** While a test is running, a
   request without it always gets the current version, so the test version receives no
   traffic. Use one opaque value per customer, such as a hashed customer ID. The order
   ID, or anything else that changes per request, splits one customer across both
-  versions. Routing reads only `context`, so a `trafficKey` in `facts` is ignored.
+  versions. Routing reads only `contexts`, so a `trafficKey` in `facts` is ignored.
 
 ## Authoring Contract: changing this repo
 

@@ -35,21 +35,25 @@ Full reference: https://docs.lexq.io/api/execution
     Content-Type: application/json
     Idempotency-Key: <your-order-id>      # optional, prevents duplicate execution
 
-    { "facts": { "paymentAmount": 150000, "customerTier": "VIP" }, "context": {} }
+    { "facts": { "paymentAmount": 150000, "customerTier": "VIP" }, "contexts": {} }
 
 `facts` is required. To see which facts a deployed policy needs:
 `GET /api/v1/execution/groups/{groupId}/requirements`.
 
-`context` is optional request metadata. Values your rules evaluate belong in
-`facts`. LexQ uses `context` in two ways. While an A/B test is running,
-`context.trafficKey` decides which version serves the request, and without it the
+`contexts` is optional request metadata. Values your rules evaluate belong in
+`facts`. LexQ uses `contexts` in two ways. While an A/B test is running,
+`contexts.trafficKey` decides which version serves the request, and without it the
 test version gets no traffic ([Traffic Identity Key](https://docs.lexq.io/guides/ab-testing#traffic-identity-key)).
 The whole object is also recorded with the execution, so keep personal data out of it.
+
+`facts` and `contexts` are the only top-level fields. Any other field fails with
+`C-001` / `400`, even when its value is `{}` or `null`. That includes `context`, the
+old name of `contexts`.
 
 `Idempotency-Key` is capped at **255 characters**. LexQ rejects a longer key with
 `I-003` / `400` rather than truncating it, because two different keys must never
 collapse into one and replay each other's result. These examples pass the order ID
-straight through, so if your IDs can exceed that, hash them first. Like `context`,
+straight through, so if your IDs can exceed that, hash them first. Like `contexts`,
 the key is recorded with the execution, so it must not carry personal data.
 
 ### Response
@@ -58,7 +62,10 @@ the key is recorded with the execution, so it must not carry personal data.
       "result": "SUCCESS",
       "data": {
         "traceId": "2e31f2b8-...",       // the execution's audit handle
+        "executedAt": "...",
+        "totalProcessingTimeMs": ...,
         "inputFacts": { ... },
+        "inputContexts": { ... },        // the contexts the request sent
         "mutatedFacts": { ... },         // facts changed by rule actions
         "generatedVariables": { ... },
         "executionTraces": [ ... ],
