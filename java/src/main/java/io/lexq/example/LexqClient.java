@@ -93,7 +93,7 @@ public class LexqClient {
                         }
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("facts", facts, "context", Map.of()))
+                    .body(Map.of("facts", facts, "contexts", Map.of()))
                     .retrieve()
                     // toEntity, not body: the HTTP status classifies the failure and the
                     // exception handler needs it. body() would discard it.
@@ -140,7 +140,12 @@ public class LexqClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExecutionResult(
             String traceId,                          // the execution's audit handle
+            String executedAt,
+            // Long, not long. Jackson 3 refuses to read a missing field into a primitive,
+            // and that error fails the whole response, not just this field.
+            Long totalProcessingTimeMs,
             Map<String, Object> inputFacts,
+            Map<String, Object> inputContexts,
             Map<String, Object> mutatedFacts,        // facts changed by rule actions
             Map<String, Object> generatedVariables,
             List<ExecutionTrace> executionTraces,
@@ -149,15 +154,12 @@ public class LexqClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExecutionTrace(
-            String tenantId,
             String policyGroupId,
             String policyVersionId,
             String ruleId,
             String ruleName,
-            String executedAt,
             boolean matched,
             String matchExpression,
-            Map<String, Object> inputFacts,
             List<Object> generatedActions
     ) { }
 
