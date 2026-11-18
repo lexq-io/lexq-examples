@@ -42,7 +42,7 @@ app.post("/price", async (req, res) => {
         // table is at https://docs.lexq.io/api/execution#error-handling.
         let status: number;
         if (err.httpStatus === null) {
-            // Never reached LexQ. A genuine upstream problem.
+            // Never reached LexQ, or ran out of time. A genuine upstream problem.
             status = 502;
         } else if (err.httpStatus === 429 || err.errorCode === "I-002") {
             // C-007 rate limit, or I-002 same Idempotency-Key still in flight. Transient.

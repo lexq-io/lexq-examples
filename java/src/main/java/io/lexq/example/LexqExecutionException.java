@@ -14,6 +14,7 @@ public class LexqExecutionException extends RuntimeException {
 
     /**
      * @param httpStatus LexQ's HTTP status, or {@code null} if the call never reached LexQ
+     *                   or ran out of time
      * @param errorCode  the LexQ error code (e.g. {@code P-015}), or {@code null} for a
      *                   transport error
      */
@@ -25,7 +26,7 @@ public class LexqExecutionException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
-    /** LexQ's HTTP status, or {@code null} when the call never reached LexQ. */
+    /** LexQ's HTTP status, or {@code null} when the call never reached LexQ or ran out of time. */
     public Integer getHttpStatus() {
         return httpStatus;
     }

@@ -1,6 +1,8 @@
 package io.lexq.example;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
@@ -12,8 +14,11 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.UnknownContentTypeException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 
 /**
@@ -24,15 +29,31 @@ import java.util.function.Predicate;
 @Component
 public class LexqClient {
 
+    private static final Logger log = LoggerFactory.getLogger(LexqClient.class);
+
     /**
      * Claim every status for a handler that does nothing, which stops RestClient from
-     * throwing on 4xx/5xx. {@link #evaluate} inspects the LexQ envelope instead.
+     * throwing on 4xx/5xx. {@link #send} inspects the LexQ envelope instead.
      *
      * <p>The predicate selects which statuses this handler owns, not which ones count as
      * errors. A predicate that matches nothing leaves Spring's default handler in place,
      * so every LexQ error surfaces as a transport failure with no status and no code.
      */
     private static final Predicate<HttpStatusCode> ALL = status -> true;
+
+    /**
+     * Time limits and retries. What to do once every attempt has failed is the caller's
+     * decision: https://docs.lexq.io/api/execution#when-lexq-is-slow-or-unavailable
+     *
+     * <p>An attempt may take up to 5 seconds, from sending the request to the last byte of
+     * the response. The JDK client that Spring Boot uses here has no read timeout by
+     * default, so without one a call waits as long as LexQ takes. A call makes at most 3
+     * attempts, and starts one only if it can finish within 15 seconds of the start of the
+     * call.
+     */
+    private static final Duration ATTEMPT_TIMEOUT = Duration.ofSeconds(5);
+    private static final int MAX_ATTEMPTS = 3;
+    private static final Duration DEADLINE = Duration.ofSeconds(15);
 
     private final RestClient restClient;
     private final String apiKey;
@@ -46,8 +67,8 @@ public class LexqClient {
      *
      * <p>Spring Boot built the injected builder's request factory from
      * {@code requestFactoryBuilder} and {@code httpClientSettings}. Building a new factory
-     * from the same two keeps the application's HTTP client settings, such as timeouts,
-     * and changes only how redirects are handled.
+     * from the same two keeps the application's other HTTP client settings, such as an SSL
+     * bundle, and changes only the redirects and the read timeout of calls to LexQ.
      */
     LexqClient(LexqProperties props, RestClient.Builder builder,
                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
@@ -58,13 +79,14 @@ public class LexqClient {
                 .baseUrl(props.apiUrl())
                 // Do not follow redirects. Spring Boot follows them by default and sends the
                 // x-api-key header to whatever host the Location header names, and on a 307
-                // or 308 the body too. With DONT_FOLLOW, a 3xx reaches evaluate() and fails
+                // or 308 the body too. With DONT_FOLLOW, a 3xx reaches send() and fails
                 // with its status. The usual cause of a 3xx is a wrong LEXQ_API_URL:
                 // http://api.lexq.io answers with a 301 to https.
-                .requestFactory(requestFactoryBuilder.build(
-                        httpClientSettings.withRedirects(HttpRedirects.DONT_FOLLOW)))
+                .requestFactory(requestFactoryBuilder.build(httpClientSettings
+                        .withRedirects(HttpRedirects.DONT_FOLLOW)
+                        .withReadTimeout(ATTEMPT_TIMEOUT)))
                 // A non-2xx status and a 2xx body with result != SUCCESS are both
-                // handled explicitly in evaluate(); disable RestClient's default throw.
+                // handled explicitly in send(); disable RestClient's default throw.
                 .defaultStatusHandler(ALL, (request, response) -> { })
                 .build();
     }
@@ -79,21 +101,62 @@ public class LexqClient {
      *
      * @param idempotencyKey a stable key (e.g. your order ID) so a retry of the
      *                       same request does not execute twice; may be {@code null}.
+     *                       Without one, the call makes a key of its own, which only its
+     *                       own retries share.
      */
     public ExecutionResult evaluate(Map<String, Object> facts, String idempotencyKey) {
+        // Every attempt sends the same key and the same body. If an earlier attempt
+        // succeeded, LexQ answers with its stored response instead of running the decision
+        // again, and does not bill the retry. Without a key, each attempt would run and be
+        // billed.
+        String key = idempotencyKey == null || idempotencyKey.isEmpty()
+                ? UUID.randomUUID().toString()
+                : idempotencyKey;
+        Map<String, Object> body = Map.of("facts", facts, "contexts", Map.of());
+
+        long deadline = System.nanoTime() + DEADLINE.toNanos();
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return send(key, body);
+            } catch (LexqExecutionException e) {
+                if (!isRetryable(e) || attempt == MAX_ATTEMPTS) {
+                    throw e;
+                }
+                // Wait 1 second, then 2, each plus a random extra of up to half, so that calls
+                // that failed together do not all retry at once. The docs ask for a wait of a
+                // second after a 429.
+                long waitMillis = (long) (1000L * (1L << (attempt - 1))
+                        * (1 + ThreadLocalRandom.current().nextDouble() / 2));
+                if (Duration.ofMillis(waitMillis).plus(ATTEMPT_TIMEOUT).toNanos()
+                        > deadline - System.nanoTime()) {
+                    throw e;
+                }
+                log.warn("Attempt {} failed: {}. Retrying in {} ms",
+                        attempt, e.getMessage(), waitMillis);
+                try {
+                    Thread.sleep(waitMillis);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+    }
+
+    /**
+     * One attempt. A failure throws {@link LexqExecutionException}, which
+     * {@code evaluate()} retries or passes on.
+     */
+    private ExecutionResult send(String idempotencyKey, Map<String, Object> body) {
         ResponseEntity<ExecutionEnvelope> response;
         try {
             response = restClient.post()
                     .uri("/api/v1/execution/groups/{groupId}", groupId)
                     // The API key lives on the server only. It never ships to a browser.
                     .header("x-api-key", apiKey)
-                    .headers(headers -> {
-                        if (idempotencyKey != null) {
-                            headers.set("Idempotency-Key", idempotencyKey);
-                        }
-                    })
+                    .header("Idempotency-Key", idempotencyKey)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("facts", facts, "contexts", Map.of()))
+                    .body(body)
                     .retrieve()
                     // toEntity, not body: the HTTP status classifies the failure and the
                     // exception handler needs it. body() would discard it.
@@ -104,7 +167,8 @@ public class LexqClient {
             // status is known here, unlike a transport error, so it is worth keeping.
             throw new LexqExecutionException(e.getStatusCode().value(), null, "non-JSON response");
         } catch (RestClientException e) {
-            // No status: the request never reached LexQ, or its response could not be read.
+            // No status: the request never reached LexQ, ran out of time, or its response
+            // could not be read.
             throw new LexqExecutionException(null, null, "transport error: " + e.getMessage());
         }
 
@@ -117,6 +181,18 @@ public class LexqClient {
                     envelope != null ? envelope.message() : "empty response");
         }
         return envelope.data();
+    }
+
+    /**
+     * Retry only failures that can clear up on their own within seconds: no complete
+     * response, a 502, 503 or 504, a 429, and I-002, which means a request with this key is
+     * still running. Any other failure goes back to the caller at once.
+     */
+    private static boolean isRetryable(LexqExecutionException e) {
+        Integer status = e.getHttpStatus();
+        return status == null
+                || status == 429 || status == 502 || status == 503 || status == 504
+                || "I-002".equals(e.getErrorCode());
     }
 
     // ── Execution API contract ──────────────────────────────────────────────
