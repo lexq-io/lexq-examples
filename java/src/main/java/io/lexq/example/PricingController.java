@@ -16,7 +16,6 @@ import java.util.Map;
 
 /**
  * A pricing endpoint: asks LexQ to apply discount rules to an order.
- * The decision is made server-side; the LexQ API key never reaches a browser.
  */
 @RestController
 public class PricingController {
@@ -36,8 +35,7 @@ public class PricingController {
         // Built with put, not Map.of: Map.of rejects null values, so one absent request
         // field would throw a NullPointerException here and LexQ would never be called.
         // Omit what is missing and let the engine answer instead. P-015 names exactly
-        // which required facts were absent, which is better than anything this method
-        // could work out on its own.
+        // which required facts were absent.
         Map<String, Object> facts = new LinkedHashMap<>();
         if (request.paymentAmount() != null) facts.put("paymentAmount", request.paymentAmount());
         if (request.customerTier() != null) facts.put("customerTier", request.customerTier());
@@ -89,11 +87,11 @@ public class PricingController {
             // Branch on the code, not the status: I-001 and I-002 are both 409 and their
             // correct handling is opposite. I-002 says "try again later"; I-001 says the
             // key is already spent, so retrying it forever returns the same 409.
-            // A duplicate of an *identical* request never lands here at all. LexQ replays
+            // A duplicate of an identical request never lands here at all. LexQ replays
             // the original response with 200 and the same traceId.
             status = HttpStatus.SERVICE_UNAVAILABLE;
         } else if (lexqStatus < 500) {
-            // LexQ rejected *this service's* request, for example a missing fact (P-015), a
+            // LexQ rejected this service's request, for example a missing fact (P-015), a
             // malformed body (C-001) or a group with no deployed version (P-019). Retrying
             // it unchanged fails the same way. The fix belongs in this service, so do not
             // report it as an upstream outage.
@@ -106,7 +104,7 @@ public class PricingController {
                 lexqStatus, e.getErrorCode(), e);
 
         // Surface the code. It is the stable identifier callers and dashboards branch on;
-        // the message is not. Collapsing it to a generic string is what hides these bugs.
+        // the message is not.
         Map<String, String> body = new LinkedHashMap<>();
         body.put("error", "rule evaluation failed");
         if (e.getErrorCode() != null) {

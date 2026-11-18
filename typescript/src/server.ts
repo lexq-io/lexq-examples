@@ -5,7 +5,6 @@ const app = express();
 app.use(express.json());
 
 // A pricing endpoint: asks LexQ to apply discount rules to an order.
-// The decision is made server-side; the LexQ API key never reaches a browser.
 app.post("/price", async (req, res) => {
     // Express 5 leaves req.body undefined when the request is not JSON. Fall back to an
     // empty object so the call still reaches LexQ, which names the missing facts (P-015).
@@ -50,11 +49,11 @@ app.post("/price", async (req, res) => {
             // Branch on the code, not the status: I-001 and I-002 are both 409 and their
             // correct handling is opposite. I-002 says "try again later"; I-001 says the
             // key is already spent, so retrying it forever returns the same 409.
-            // A duplicate of an *identical* request never lands here at all. LexQ replays
+            // A duplicate of an identical request never lands here at all. LexQ replays
             // the original response with 200 and the same traceId.
             status = 503;
         } else if (err.httpStatus < 500) {
-            // LexQ rejected *this service's* request, for example a missing fact (P-015), a
+            // LexQ rejected this service's request, for example a missing fact (P-015), a
             // malformed body (C-001) or a group with no deployed version (P-019). Retrying
             // it unchanged fails the same way. The fix belongs in this service, so do not
             // report it as an upstream outage.
@@ -69,7 +68,7 @@ app.post("/price", async (req, res) => {
         );
 
         // Surface the code. It is the stable identifier callers and dashboards branch on;
-        // the message is not. Collapsing it to a generic string is what hides these bugs.
+        // the message is not.
         res.status(status).json({
             error: "rule evaluation failed",
             ...(err.errorCode ? { lexqErrorCode: err.errorCode } : {}),

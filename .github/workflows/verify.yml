@@ -1,15 +1,9 @@
-# These examples are a hand-maintained copy of the LexQ contract. Nothing syncs
-# them when the engine changes, so the only thing standing between a contract
-# change and a reader pasting broken code is this workflow.
+# Checks both tracks on every pull request and every push to main. The TypeScript
+# job installs from the lockfile and type-checks, and the Java job compiles, so a
+# dependency update or an edit that breaks one of those steps fails here.
 #
-# It compiles both tracks. That will not catch a value that changed meaning, but
-# it does catch the failures that actually happen here: a response field that
-# disappeared, an enum that was renamed, a type that stopped lining up. Those are
-# the ones that reach a reader as a compile error in their own editor.
-#
-# No network calls to LexQ. A test that needs a live key and a deployed policy
-# cannot run on a fork's pull request, and a gate that only runs sometimes is not
-# a gate.
+# It makes no calls to LexQ. They need an API key and a deployed policy, and a pull
+# request from a fork is not given repository secrets.
 
 name: Verify
 
@@ -40,8 +34,8 @@ jobs:
       # versions a reader actually installs.
       - run: npm ci
 
-      # tsx strips types without checking them, so `npm run dev` passing proves
-      # nothing about the contract. This is the check.
+      # tsx strips types without checking them, so `npm run dev` runs code even when
+      # it has type errors. This step reports them.
       - run: npm run typecheck
 
   java:
