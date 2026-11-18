@@ -72,9 +72,9 @@ These properties are what the examples teach. Keep them when you port the code:
 - **Branch on `errorCode`, not on the HTTP status.** `I-001` and `I-002` are both 409.
   Retry `I-002` later, because a request with the same key is still running. Never
   retry `I-001` with the same key, because that key already served a different body.
-  Both tracks answer 503 for 429 and `I-002`, 502 when LexQ was not reached or
-  answered with a 5xx, and 500 for a 3xx or any other 4xx, because the fix belongs in
-  the calling service.
+  Both tracks answer 503 for 429 and `I-002`, 502 when a call did not reach LexQ, ran
+  out of time or got a 5xx, and 500 for a 3xx or any other 4xx, because the fix
+  belongs in the calling service.
 - **Read results from `mutatedFacts` and `generatedVariables`, and fall back to the
   input.** `mutatedFacts` holds facts a rule changed. Keys the request did not send,
   such as a `SET_FACT` target or `isBlocked`, arrive in `generatedVariables`. A key in
@@ -98,9 +98,16 @@ These properties are what the examples teach. Keep them when you port the code:
   different body fails with `I-001`, so pricing a changed order again needs a new key.
   Keys are capped at 255 characters and are recorded with the execution, so hash long
   IDs and keep personal data out of them.
-- **Set a timeout, and agree on the fallback.** The examples keep their HTTP clients'
-  default timeouts and answer 502 when LexQ cannot be reached. Ask the user whether
-  their flow should fail that way or continue with a default decision.
+- **Put a time limit on every call, retry with the same key, and agree on the
+  fallback.** Each attempt gets up to 5 seconds, and a call makes at most 3 attempts
+  within 15 seconds. Both tracks retry when no complete response arrives, on a 502,
+  503, 504 or 429, and on `I-002`, waiting at least 1 second, then at least 2. Every
+  attempt sends the same `Idempotency-Key` and the same body, and a call without a key
+  makes its own. If an earlier attempt succeeded, LexQ answers the retry with its
+  stored response and does not bill it. Ask the user whether their flow should fail
+  when the attempts run out, as the examples do, or continue with a default decision.
+  [When LexQ Is Slow or Unavailable](https://docs.lexq.io/api/execution.md#when-lexq-is-slow-or-unavailable)
+  in the docs says what to do about each kind of failure.
 - **Carry over the comments that explain the LexQ contract.** Leave behind the ones
   about the source language, such as the JavaScript number note.
 

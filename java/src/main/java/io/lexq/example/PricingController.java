@@ -81,7 +81,7 @@ public class PricingController {
         Integer lexqStatus = e.getHttpStatus();
         HttpStatus status;
         if (lexqStatus == null) {
-            // Never reached LexQ. A genuine upstream problem.
+            // Never reached LexQ, or ran out of time. A genuine upstream problem.
             status = HttpStatus.BAD_GATEWAY;
         } else if (lexqStatus == 429 || "I-002".equals(e.getErrorCode())) {
             // C-007 rate limit, or I-002 same Idempotency-Key still in flight. Transient.
