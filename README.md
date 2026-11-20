@@ -129,7 +129,9 @@ properties when you port the code:
   `RestClient.builder()` reads doubles). Python: read with
   `response.json(parse_float=Decimal)`, which works with `httpx` and `requests`, and
   send amounts as JSON numbers. `json.dumps` rejects `Decimal`, and `default=str`
-  turns it into a string that no rule matches. Go: `json.Decoder.UseNumber()`.
+  turns it into a string. For a registered `NUMBER` fact the call then fails with
+  `P-060`, and for an unregistered one the rule that reads it does not fire. Go:
+  `json.Decoder.UseNumber()`.
   JavaScript has no decimal type, so `@lexq/sdk` reads every number as its own
   `Decimal`, which keeps the digits LexQ wrote.
 - **Leave out a value you do not have instead of sending `null`.** Both tracks drop
@@ -165,10 +167,14 @@ properties when you port the code:
 LexQ does not report these as errors. When a decision looks wrong, read
 `decisionTraces` in the response. Each rule's entry says whether it fired and why.
 
-- **Send each fact in its declared type.** A number sent as a string (`"150000"`) does
-  not match, and neither does a `LIST_STRING` or `LIST_NUMBER` fact sent as a
-  comma-joined string instead of a JSON array. The rule does not fire, and its
-  `decisionTraces[].reasonDetail` reads `Evaluation error: FACT_TYPE_MISMATCH`.
+- **Register the facts your rules read.** LexQ checks a value's type only for a fact
+  that was registered before the deployed version was published. For any other key, a
+  number sent as a string (`"150000"`) does not match, and neither does a list sent as
+  a comma-joined string instead of a JSON array. The rule does not fire, and its
+  `decisionTraces[].reasonDetail` reads `Evaluation error: FACT_TYPE_MISMATCH`. A
+  registered fact sent that way fails the call with `P-060` / `400` instead.
+  [Unregistered Facts](https://docs.lexq.io/guides/fact-definitions#unregistered-facts)
+  in the docs explains the check.
 - **Check `isBlocked`.** A `BLOCK` action neither fails the call nor stops other
   rules. It sets `isBlocked` in `generatedVariables`, and the caller has to enforce it.
 - **Use a stable `contexts.trafficKey` when A/B testing.** While a test is running, a
