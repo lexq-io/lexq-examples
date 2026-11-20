@@ -7,7 +7,7 @@
     "strict": true,
     "skipLibCheck": true,
     // TypeScript 7 loads no @types package unless it is listed here. Without this line,
-    // `process` in lexqClient.ts still resolves, but only because @types/express happens
+    // `process` in server.ts still resolves, but only because @types/express happens
     // to pull in Node's types.
     "types": ["node"],
     "outDir": "dist"

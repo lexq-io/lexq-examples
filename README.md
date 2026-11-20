@@ -5,6 +5,10 @@ How to integrate [LexQ](https://lexq.io) into your backend service.
 LexQ is called server-side: your service gathers the facts, calls the LexQ
 Execution API, and uses the decision it returns.
 
+In Node.js, call it through [`@lexq/sdk`](https://github.com/lexq-io/lexq-sdk-node),
+LexQ's client for the Execution API: `npm install @lexq/sdk`. In other languages,
+call the API over HTTP as described below.
+
 ## The Execution API
 
 - Base URL: `https://api.lexq.io/api/v1/execution`
@@ -77,12 +81,18 @@ exactly which rules produced this decision.
 
 ## Worked example
 
-- [`typescript/`](./typescript): a runnable pricing service in Node.js (Express)
-- [`java/`](./java): the same pricing service in Spring Boot
+- [`typescript/`](./typescript): a runnable pricing service in Node.js (Express),
+  using `@lexq/sdk`
+- [`java/`](./java): the same pricing service in Spring Boot, calling the API
+  directly
 
 ## Porting Contract
 
-These properties are what the examples teach. Keep them when you port the code:
+These properties are what the examples teach. The Java track follows them in its own
+code, so it is the track to port to a language without an SDK. In the TypeScript
+track, `@lexq/sdk` sends the request and reads the response, and `server.ts` builds
+the facts, passes the key and picks the status for each failure. Keep these
+properties when you port the code:
 
 - **Stop the HTTP client from throwing on error statuses.** LexQ reports failures in
   the response body, for 5xx as well as 4xx, so the client has to return the body for
@@ -120,8 +130,8 @@ These properties are what the examples teach. Keep them when you port the code:
   `response.json(parse_float=Decimal)`, which works with `httpx` and `requests`, and
   send amounts as JSON numbers. `json.dumps` rejects `Decimal`, and `default=str`
   turns it into a string that no rule matches. Go: `json.Decoder.UseNumber()`.
-  JavaScript has no decimal type, and the comment near the top of `lexqClient.ts` says
-  when that matters.
+  JavaScript has no decimal type, so `@lexq/sdk` reads every number as its own
+  `Decimal`, which keeps the digits LexQ wrote.
 - **Leave out a value you do not have instead of sending `null`.** Both tracks drop
   missing fields, and LexQ answers `P-015` with their names. In Python, drop `None`
   values before sending, for example with Pydantic's `model_dump(exclude_none=True)`.
@@ -133,18 +143,22 @@ These properties are what the examples teach. Keep them when you port the code:
   Keys are capped at 255 characters and are recorded with the execution, so hash long
   IDs and keep personal data out of them.
 - **Put a time limit on every call, retry with the same key, and agree on the
-  fallback.** Each attempt gets up to 5 seconds, and a call makes at most 3 attempts
-  within 15 seconds. Both tracks retry when no complete response arrives, on a 502,
-  503, 504 or 429, and on `I-002`, waiting at least 1 second, then at least 2. Every
+  fallback.** In the Java track, each attempt gets up to 5 seconds, and a call makes
+  at most 3 attempts within 15 seconds. The track retries when no complete response
+  arrives, on a 502, 503, 504 or 429, and on `I-002`, waiting at least 1 second, then
+  at least 2. `@lexq/sdk` retries the same failures within its own deadline, and its
+  circuit breaker stops calling LexQ for a while when calls keep failing. The SDK's
+  [README](https://github.com/lexq-io/lexq-sdk-node#usage) lists the defaults. Every
   attempt sends the same `Idempotency-Key` and the same body, and a call without a key
   makes its own. If an earlier attempt succeeded, LexQ answers the retry with its
   stored response and does not bill it. Agree with whoever owns the flow that calls
   LexQ on whether it should fail when the attempts run out, as the examples do, or
-  continue with a default decision.
+  continue with a default decision. With the SDK, every call passes that decision as
+  its `fallback`.
   [When LexQ Is Slow or Unavailable](https://docs.lexq.io/api/execution#when-lexq-is-slow-or-unavailable)
   in the docs says what to do about each kind of failure.
 - **Carry over the comments that explain the LexQ contract.** Leave behind the ones
-  about the source language, such as the JavaScript number note.
+  about the source language, such as the note on `Map.of` in `PricingController.java`.
 
 ## Mistakes that still return 200
 
