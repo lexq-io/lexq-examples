@@ -29,17 +29,24 @@ Read these before you port the client or change this repository:
    no state between calls, so send a starting value like `0`. The list covers what a
    request must carry, not every fact a rule writes, so also ask the user which fact
    holds the decision.
-3. Port the client. Each track keeps all LexQ HTTP code in one file:
-   [`typescript/src/lexqClient.ts`](typescript/src/lexqClient.ts) and
-   [`java/src/main/java/io/lexq/example/LexqClient.java`](java/src/main/java/io/lexq/example/LexqClient.java).
-   The endpoint that calls it ([`server.ts`](typescript/src/server.ts),
-   [`PricingController.java`](java/src/main/java/io/lexq/example/PricingController.java))
+3. Use the SDK in Node.js, or port the Java client to another language. Install the
+   SDK with `npm install @lexq/sdk`
+   ([README](https://github.com/lexq-io/lexq-sdk-node#readme)).
+   [`typescript/src/server.ts`](typescript/src/server.ts) creates one client for the
+   service, builds the facts, and picks an HTTP status for each LexQ failure in its
+   `fallback`.
+   [`java/src/main/java/io/lexq/example/LexqClient.java`](java/src/main/java/io/lexq/example/LexqClient.java)
+   keeps all LexQ HTTP code in one file, and
+   [`PricingController.java`](java/src/main/java/io/lexq/example/PricingController.java)
    builds the facts and maps LexQ failures to HTTP statuses. Keep every property in the
    [Porting Contract](README.md#porting-contract).
 4. Call `POST /api/v1/execution/groups/{groupId}` where the decision is needed, with
    `{"facts": {...}}` and an `Idempotency-Key` that identifies this exact request, such
    as the order ID. Store `data.traceId` with the record the decision applies to, such
-   as the order.
+   as the order. With the SDK, the call is
+   `execute(groupId, { facts, idempotencyKey, fallback })`, and the traceId is
+   `result.traceId` when `result.source` is `"lexq"`. The `fallback` returns what the
+   service uses when the call fails, so ask the user what that should be.
 5. Finish with one real call against the deployed policy, or ask the user to run one.
    It is billed and stays in execution history, so use test values without personal
    data. In the response, `decisionTraces` should mark the rule you expect as
