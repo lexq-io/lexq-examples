@@ -28,7 +28,7 @@ When you port this code, keep the [Porting Contract](../README.md#porting-contra
 
    The response carries the price LexQ returned and the trace handle for it:
 
-       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"aeae1ab1-b7c6-4454-ae06-8a353c59a482"}
+       {"orderId":"order-1","finalPrice":135000,"lexqTraceId":"75545fee-9261-44f5-ae79-d8c49766c24d"}
 
    `finalPrice` is whatever your deployed rules produced. The
    [quickstart](https://docs.lexq.io/quickstart) policy takes 10% off any order of
