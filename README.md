@@ -91,8 +91,8 @@ exactly which rules produced this decision.
 These properties are what the examples teach. The Java track follows them in its own
 code, so it is the track to port to a language without an SDK. In the TypeScript
 track, `@lexq/sdk` sends the request and reads the response, and `server.ts` builds
-the facts, passes the key and picks the status for each failure. Keep these
-properties when you port the code:
+the facts, passes the key, takes the price from `mutatedFacts` or `inputFacts` and
+picks the status for each failure. Keep these properties when you port the code:
 
 - **Stop the HTTP client from throwing on error statuses.** LexQ reports failures in
   the response body, for 5xx as well as 4xx, so the client has to return the body for
@@ -134,9 +134,16 @@ properties when you port the code:
   `json.Decoder.UseNumber()`.
   JavaScript has no decimal type, so `@lexq/sdk` reads every number as its own
   `Decimal`, which keeps the digits LexQ wrote.
-- **Leave out a value you do not have instead of sending `null`.** Both tracks drop
-  missing fields, and LexQ answers `P-015` with their names. In Python, drop `None`
-  values before sending, for example with Pydantic's `model_dump(exclude_none=True)`.
+- **Leave out a value you do not have, unless the policy is built for `null`.** When
+  a request leaves out a key that an enabled rule reads, the call fails with `P-015`,
+  which names the key. A key sent as `null` reaches the rules, but a condition on it
+  does not match: a rule with the condition `paymentAmount >= 100000` does not fire
+  for `"paymentAmount": null`, and the call returns 200. Both tracks leave out a field
+  that is missing or `null`, because an order without an amount cannot be priced. In
+  Python, drop `None` values before sending, for example with Pydantic's
+  `model_dump(exclude_none=True)`.
+  [When an input is null](https://docs.lexq.io/guides/policy-rules#when-an-input-is-null)
+  in the docs shows how to build a policy that decides without the value.
 - **Keep the API key on the server.** It goes in the `x-api-key` header, not in
   `Authorization`, and only from a backend.
 - **Keep the idempotency key and the traceId.** A retry with the same key and the same

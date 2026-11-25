@@ -1,5 +1,5 @@
 import express from "express";
-import { LexqClient, LexqError } from "@lexq/sdk";
+import { LexqClient, type LexqError } from "@lexq/sdk";
 
 // One client for the whole service. Its circuit breaker counts failed calls across
 // requests, so a client created for each request would never open it.
@@ -22,10 +22,15 @@ app.post("/price", async (req, res) => {
     const result = await lexq.execute(groupId, {
         // Facts your deployed policy expects. See GET /groups/{id}/requirements.
         //
-        // The client leaves out a fact whose value is null or undefined, so a field
-        // missing from the request is not sent at all. P-015 names exactly which required
-        // facts were absent.
-        facts: { paymentAmount, customerTier },
+        // The client leaves out a fact whose value is undefined, and LexQ answers P-015
+        // with the name of each missing fact that a rule reads. The client sends null as
+        // null, and a condition on null does not match: an order sent with
+        // "paymentAmount": null would get 200 and a finalPrice of null. `?? undefined`
+        // leaves out a null field too.
+        facts: {
+            paymentAmount: paymentAmount ?? undefined,
+            customerTier: customerTier ?? undefined,
+        },
         // Idempotency: a retry of the same order won't execute twice. The client accepts
         // only a string key, so an order ID sent as a JSON number is converted first.
         idempotencyKey: orderId == null ? undefined : String(orderId),
@@ -44,7 +49,7 @@ app.post("/price", async (req, res) => {
         // the message is not. JSON.stringify leaves it out when there is none.
         res.status(result.value).json({
             error: "rule evaluation failed",
-            lexqErrorCode: error instanceof LexqError ? error.errorCode : undefined,
+            lexqErrorCode: error.errorCode,
         });
         return;
     }
@@ -55,10 +60,10 @@ app.post("/price", async (req, res) => {
 
     res.json({
         orderId,
-        // result.facts holds the facts LexQ received, updated with every change a rule
-        // made. The amount is a Decimal, which the response writes with the digits LexQ
-        // sent.
-        finalPrice: result.facts.paymentAmount,
+        // A fact appears in mutatedFacts only when a rule changed it. With no matching
+        // discount, the amount in inputFacts, as LexQ received it, is the final price.
+        // Both are Decimals, which the response writes with the digits LexQ sent.
+        finalPrice: result.mutatedFacts.paymentAmount ?? result.inputFacts.paymentAmount,
         lexqTraceId: result.traceId,
     });
 });
@@ -66,11 +71,11 @@ app.post("/price", async (req, res) => {
 // Not every LexQ failure is an upstream outage, so they must not all become 502.
 // LexQ's status classifies the failure and the error code names it. The full table is
 // at https://docs.lexq.io/api/execution#error-handling.
-function failureStatus(error: LexqError | TypeError): number {
-    if (!(error instanceof LexqError)) {
-        // A TypeError: the client refused to send what this service passed to it, such as
-        // an empty order ID or one that a header cannot carry. Nothing reached LexQ, and
-        // the fix belongs in this service.
+function failureStatus(error: LexqError): number {
+    if (error.reason === "invalid_input") {
+        // The client refused to send what this service passed to it, such as an empty
+        // order ID or one that a header cannot carry. Nothing reached LexQ, and the fix
+        // belongs in this service.
         return 500;
     }
     if (error.reason !== "response") {
